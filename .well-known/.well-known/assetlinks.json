@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.jaderfelipe.merito",
+        "sha256_cert_fingerprints": ["E5:CE:C4:9E:87:53:B0:08:F9:50:D0:7D:C6:A2:16:90:4E:1D:94:14:BA:5E:DD:62:25:CD:59:94:95:41:CA:E6"]
+      }
+    }]
