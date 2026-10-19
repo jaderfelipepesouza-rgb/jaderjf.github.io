@@ -11,9 +11,9 @@
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 --bg:#faf8f2;--card:#fff;--tx:#1c1a12;--mu:#7b7563;--ac:#c9a227;--acd:#8f6f0e;--ink:#1c1500;--bd:#ebe5d1;--soft:#f5f1e4;--pos:#2e7d6b;--neg:#b5473a;
---a0:#2e7d6b;--a1:#3b5b8c;--a2:#b5546b;--f:"Montserrat",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--s:"Cinzel","Cormorant Garamond",Georgia,"Times New Roman",serif;color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0d0a;--card:#181610;--tx:#f4eed9;--mu:#a39b83;--ac:#d9b03a;--acd:#d9b03a;--bd:#2d291b;--soft:#13110c;--pos:#4fb39c;--neg:#e0796a;--a0:#4fb39c;--a1:#7a9bd6;--a2:#e07f98;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0e0d0a;--card:#181610;--tx:#f4eed9;--mu:#a39b83;--ac:#d9b03a;--acd:#d9b03a;--bd:#2d291b;--soft:#13110c;--pos:#4fb39c;--neg:#e0796a;--a0:#4fb39c;--a1:#7a9bd6;--a2:#e07f98;color-scheme:dark}
+--a0:#2e7d6b;--a1:#3b5b8c;--a2:#b5546b;--a3:#8a6bbe;--a4:#d17a2f;--a5:#4a8fb8;--a6:#7a8f3a;--a7:#a0527a;--f:"Montserrat",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--s:"Cinzel","Cormorant Garamond",Georgia,"Times New Roman",serif;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0d0a;--card:#181610;--tx:#f4eed9;--mu:#a39b83;--ac:#d9b03a;--acd:#d9b03a;--bd:#2d291b;--soft:#13110c;--pos:#4fb39c;--neg:#e0796a;--a0:#4fb39c;--a1:#7a9bd6;--a2:#e07f98;--a3:#b79af0;--a4:#f0a05c;--a5:#6cb7e0;--a6:#a9c25a;--a7:#d97fb0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e0d0a;--card:#181610;--tx:#f4eed9;--mu:#a39b83;--ac:#d9b03a;--acd:#d9b03a;--bd:#2d291b;--soft:#13110c;--pos:#4fb39c;--neg:#e0796a;--a0:#4fb39c;--a1:#7a9bd6;--a2:#e07f98;--a3:#b79af0;--a4:#f0a05c;--a5:#6cb7e0;--a6:#a9c25a;--a7:#d97fb0;color-scheme:dark}
 html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-tap-highlight-color:transparent}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:14.5px/1.5 var(--f);font-variant-numeric:tabular-nums;padding-bottom:96px}
@@ -45,6 +45,8 @@ main{padding:20px 16px;max-width:560px;margin:0 auto}
 .btn{border:0;background:linear-gradient(180deg,#ecd272,#c9a227);color:var(--ink);border-radius:999px;padding:11px 16px;font:700 14px/1 var(--f);letter-spacing:.01em;min-width:80px;box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -1px 0 rgba(120,90,0,.25),0 2px 6px rgba(150,115,0,.22);transition:transform .12s}
 .btn:active{transform:scale(.95)}
 .btn.off{background:var(--soft);color:var(--mu);border:1px solid var(--bd);box-shadow:none}
+.card .sel{margin-top:5px;padding:5px 8px;font-size:12px;border-radius:8px;max-width:100%}
+.txt{width:100%;font-weight:600}
 .btn.bad{background:transparent;color:var(--neg);border:1.5px solid var(--neg);box-shadow:none}
 .btn.g{background:transparent;color:var(--mu);border:1px solid var(--bd);padding:8px 12px;font-size:12.5px;min-width:0;font-weight:600;box-shadow:none}
 .badge{background:var(--ink);color:#f3d77c;border-radius:999px;font-size:11px;font-weight:700;padding:2px 8px;margin-left:8px}
@@ -83,18 +85,21 @@ main.fade{animation:f .22s ease}
 <nav id="nav"></nav>
 <div id="toast"></div>
 <script>
-var AREAS=["Treino e saúde","Trabalho e negócio","Casa e família"];
+var AREAS=[];
 var DEF={goal:20000,
 actions:[
-{id:"a1",n:"Treinar",a:0,p:300},{id:"a2",n:"Dormir 7h ou mais",a:0,p:150},{id:"a3",n:"Alimentação dentro do plano",a:0,p:200},{id:"a4",n:"Beber a meta de água",a:0,p:100},{id:"a11",n:"Refeição livre planejada",a:0,p:50},
+{id:"a1",n:"Treinar",a:0,p:300},{id:"a2",n:"Dormir 7h ou mais",a:0,p:150},{id:"a3",n:"Alimentação dentro do plano",a:0,p:200},{id:"a4",n:"Beber a meta de água",a:0,p:100},{id:"a11",n:"Refeição livre planejada",a:0,p:50},{id:"a12",n:"Leitura (30 min)",a:3,p:150},
 {id:"a5",n:"Bloco de foco (90 min)",a:1,p:300},{id:"a6",n:"Postar conteúdo da marca",a:1,p:250},{id:"a7",n:"Avaliação física concluída",a:1,p:200},
 {id:"a8",n:"Tempo de qualidade em família",a:2,p:250},{id:"a9",n:"Tarefa de casa feita",a:2,p:100},{id:"a10",n:"Item do bebê resolvido",a:2,p:200}],
 rewards:[{id:"r1",n:"Jantar especial",c:4000},{id:"r2",n:"Dia livre sem culpa",c:6000},{id:"r3",n:"Presente para mim",c:9000}],
-slips:[{id:"s1",n:"Furar a dieta",a:0,p:100},{id:"s2",n:"Faltar ao treino",a:0,p:150},{id:"s3",n:"Noite mal dormida",a:0,p:75},{id:"s4",n:"Adiar tarefa importante",a:1,p:100}],cap:600,log:[]};
+areas:["Treino e saúde","Trabalho e negócio","Casa e família","Desenvolvimento pessoal"],slips:[{id:"s1",n:"Furar a dieta",a:0,p:100},{id:"s2",n:"Faltar ao treino",a:0,p:150},{id:"s3",n:"Noite mal dormida",a:0,p:75},{id:"s4",n:"Adiar tarefa importante",a:1,p:100}],cap:600,log:[]};
 var S,tab="resumo",area=-1,tabChanged=false;
 try{var raw=localStorage.getItem("tokens_v1");S=raw?JSON.parse(raw):null}catch(e){S=null}
 if(!S)S=JSON.parse(JSON.stringify(DEF));
-if(!S.slips)S.slips=JSON.parse(JSON.stringify(DEF.slips));if(!S.cap)S.cap=DEF.cap;
+fixS();
+function fixS(){if(!S.slips)S.slips=JSON.parse(JSON.stringify(DEF.slips));if(!S.cap)S.cap=DEF.cap;if(!S.areas||!S.areas.length)S.areas=DEF.areas.slice();AREAS=S.areas}
+function ac(i){return "var(--a"+(i%8)+")"}
+function areaOpts(sel){return AREAS.map(function(n,i){return '<option value="'+i+'"'+(i===sel?" selected":"")+'>'+esc(n)+'</option>'}).join("")}
 function save(){try{localStorage.setItem("tokens_v1",JSON.stringify(S))}catch(e){}}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function uid(){return "x"+Date.now().toString(36)+Math.floor(Math.random()*1e4)}
@@ -132,10 +137,10 @@ function vResumo(){
   var nx=S.rewards.filter(function(r){return r.c>b}).sort(function(a,c){return a.c-c.c})[0];
   h+='<div class="card"><div class="t">'+(nx?'Próxima: '+esc(nx.n)+'<small>faltam '+fmt(nx.c-b)+' tokens</small>':(S.rewards.length?'Você já pode resgatar todas as recompensas':'Crie recompensas em ⚙ Regras'))+'</div></div>';
   h+='<h3>Ganhos nos últimos 7 dias</h3><div class="card" style="display:block"><div class="bars">'+days.map(function(x){return '<div><span>'+(x.v?fmt(x.v):"")+'</span><i style="height:'+Math.round(x.v/mx*70)+'px"></i></div>'}).join("")+'</div><div class="bars" style="height:auto;margin:0">'+days.map(function(x){return '<div style="height:auto">'+x.d+'</div>'}).join("")+'</div></div>';
-  var ar=[0,0,0],n=new Date();
+  var ar=AREAS.map(function(){return 0}),n=new Date();
   S.log.forEach(function(l){var d=new Date(l.t);if(l.k==="e"&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()){var a=S.actions.filter(function(x){return x.id===l.id})[0];if(a)ar[a.a]+=l.d}});
   var am=Math.max(1,Math.max.apply(null,ar));
-  h+='<h3>Ganhos do mês por área</h3><div class="card" style="display:block">'+AREAS.map(function(a,i){return '<div class="ar" style="--c:var(--a'+i+')"><span>'+a+'</span><div class="bar"><i style="width:'+ar[i]/am*100+'%"></i></div><span>'+fmt(ar[i])+'</span></div>'}).join("")+'</div>';
+  h+='<h3>Ganhos do mês por área</h3><div class="card" style="display:block">'+AREAS.map(function(a,i){return '<div class="ar" style="--c:'+ac(i)+'"><span>'+a+'</span><div class="bar"><i style="width:'+ar[i]/am*100+'%"></i></div><span>'+fmt(ar[i])+'</span></div>'}).join("")+'</div>';
   h+='<h3>Movimentação de hoje</h3>';
   var td=S.log.filter(function(l){return dkey(l.t)===k}).reverse();
   if(!td.length)h+='<div class="empty">Nada hoje ainda. Vá em ✓ Hoje e comece.</div>';
@@ -145,11 +150,11 @@ function vResumo(){
 }
 function vHoje(){
   var h='<div class="help"><b>Como funciona:</b> toque em <b>+ tokens</b> quando concluir uma ação. Ações mais importantes valem mais. Depois troque os tokens por recompensas.</div>';
-  h+='<div class="chips"><button class="chip'+(area<0?" on":"")+'" data-area="-1">Todas</button>'+AREAS.map(function(a,i){return '<button class="chip'+(area===i?" on":"")+'" data-area="'+i+'"><i style="--c:var(--a'+i+')"></i>'+a+'</button>'}).join("")+'</div>';
+  h+='<div class="chips"><button class="chip'+(area<0?" on":"")+'" data-area="-1">Todas</button>'+AREAS.map(function(a,i){return '<button class="chip'+(area===i?" on":"")+'" data-area="'+i+'"><i style="--c:'+ac(i)+'"></i>'+a+'</button>'}).join("")+'</div>';
   var l=S.actions.filter(function(a){return area<0||a.a===area});
   if(!l.length)h+='<div class="empty">Nenhuma ação aqui. Crie em ⚙ Regras.</div>';
   l.forEach(function(a){var c=countToday(a.id);
-    h+='<div class="card" style="--c:var(--a'+a.a+')"><div class="t">'+esc(a.n)+(c?'<span class="badge">'+c+'×</span>':"")+'<small>'+AREAS[a.a]+'</small></div><button class="btn" data-earn="'+a.id+'">+'+fmt(a.p)+'</button></div>'});
+    h+='<div class="card" style="--c:'+ac(a.a)+'"><div class="t">'+esc(a.n)+(c?'<span class="badge">'+c+'×</span>':"")+'<small>'+AREAS[a.a]+'</small></div><button class="btn" data-earn="'+a.id+'">+'+fmt(a.p)+'</button></div>'});
   h+='<h3>Escorregões</h3><div class="help">Falhou? Registre aqui e perca alguns tokens. A perda é menor que o ganho, tem limite por dia e o saldo nunca fica negativo.</div>';
   S.slips.filter(function(x){return area<0||x.a===area}).forEach(function(x){
     h+='<div class="card" style="--c:var(--neg)"><div class="t">'+esc(x.n)+'<small>'+AREAS[x.a]+'</small></div><button class="btn bad" data-slip="'+x.id+'">−'+fmt(x.p)+'</button></div>'});
@@ -177,11 +182,14 @@ function vHis(){
 function vReg(){
   var h='<div class="help">Aqui você define o <b>peso</b> de cada ação, o preço das recompensas e a meta do mês. Os pesos mostram o que mais importa para você.</div>';
   h+='<h3>Meta de tokens do mês</h3><div class="card"><div class="t">Quanto quero acumular</div><input class="n" type="number" inputmode="numeric" data-goal value="'+S.goal+'"></div>';
+  h+='<h3>Áreas da vida</h3><div class="help">Crie as áreas que fazem sentido para você, como Leitura, Estudos ou Espiritualidade. Para apagar uma área, antes mude as ações dela para outra.</div>';
+  S.areas.forEach(function(n,i){h+='<div class="card" style="--c:'+ac(i)+'"><div class="t"><input class="txt" data-aname="'+i+'" value="'+esc(n)+'"></div><button class="btn g" data-delarea="'+i+'">✕</button></div>'});
+  h+='<div class="add"><input id="nAr" placeholder="Nova área (ex.: Leitura)" style="grid-column:1/-1"><button class="btn" data-addarea>Adicionar área</button></div>';
   h+='<h3>Ações e pesos</h3>';
-  S.actions.forEach(function(a){h+='<div class="card"><div class="t">'+esc(a.n)+'<small>'+AREAS[a.a]+'</small></div><input class="n" type="number" inputmode="numeric" data-pts="'+a.id+'" value="'+a.p+'"><button class="btn g" data-delA="'+a.id+'">✕</button></div>'});
+  S.actions.forEach(function(a){h+='<div class="card"><div class="t">'+esc(a.n)+'<select class="sel" data-aarea="'+a.id+'">'+areaOpts(a.a)+'</select></div><input class="n" type="number" inputmode="numeric" data-pts="'+a.id+'" value="'+a.p+'"><button class="btn g" data-delA="'+a.id+'">✕</button></div>'});
   h+='<div class="add"><input id="nA" placeholder="Nova ação"><input id="pA" type="number" inputmode="numeric" placeholder="Peso"><select id="aA">'+AREAS.map(function(a,i){return '<option value="'+i+'">'+a+'</option>'}).join("")+'</select><button class="btn" data-addA>Adicionar ação</button></div>';
   h+='<h3>Escorregões e perdas</h3>';
-  S.slips.forEach(function(x){h+='<div class="card"><div class="t">'+esc(x.n)+'<small>'+AREAS[x.a]+'</small></div><input class="n" type="number" inputmode="numeric" data-spts="'+x.id+'" value="'+x.p+'"><button class="btn g" data-dels="'+x.id+'">✕</button></div>'});
+  S.slips.forEach(function(x){h+='<div class="card"><div class="t">'+esc(x.n)+'<select class="sel" data-sarea="'+x.id+'">'+areaOpts(x.a)+'</select></div><input class="n" type="number" inputmode="numeric" data-spts="'+x.id+'" value="'+x.p+'"><button class="btn g" data-dels="'+x.id+'">✕</button></div>'});
   h+='<div class="add"><input id="nS" placeholder="Novo escorregão"><input id="pS" type="number" inputmode="numeric" placeholder="Perda"><select id="aS">'+AREAS.map(function(a,i){return '<option value="'+i+'">'+a+'</option>'}).join("")+'</select><button class="btn" data-adds>Adicionar escorregão</button></div>';
   h+='<div class="card"><div class="t">Limite de perda por dia<small>Máximo de tokens que os escorregões tiram em um dia</small></div><input class="n" type="number" inputmode="numeric" data-cap value="'+S.cap+'"></div>';
   h+='<h3>Recompensas e preços</h3>';
@@ -215,6 +223,11 @@ document.addEventListener("click",function(e){
   else if(d.earn){var a=S.actions.filter(function(x){return x.id===d.earn})[0];push("e",a.n,a.p,a.id);if(navigator.vibrate)navigator.vibrate(12);toast("+"+fmt(a.p)+" tokens · salvo")}
   else if(d.redeem){var r=S.rewards.filter(function(x){return x.id===d.redeem})[0];if(balance()<r.c)return;push("r","Resgate: "+r.n,-r.c);toast("Resgatado: "+r.n)}
   else if(d.undo){undoLog(d.undo);toast("Desfeito")}
+  else if(d.addarea!==undefined){var nn=document.getElementById("nAr").value.trim();if(!nn)return;S.areas.push(nn)}
+  else if(d.delarea!==undefined){var di=+d.delarea;
+    if(S.areas.length<=1){toast("Precisa ter ao menos uma área");return}
+    if(S.actions.some(function(a){return a.a===di})||S.slips.some(function(x){return x.a===di})){toast("Mude as ações dessa área antes de apagar");return}
+    S.areas.splice(di,1);S.actions.forEach(function(a){if(a.a>di)a.a--});S.slips.forEach(function(x){if(x.a>di)x.a--});if(area===di)area=-1;else if(area>di)area--}
   else if(d.slip){slip(d.slip)}
   else if(d.joker!==undefined){joker()}
   else if(d.dels){S.slips=S.slips.filter(function(x){return x.id!==d.dels})}
@@ -233,6 +246,9 @@ document.addEventListener("change",function(e){
   else if(d.cost)S.rewards.forEach(function(r){if(r.id===d.cost)r.c=v});
   else if(d.spts)S.slips.forEach(function(x){if(x.id===d.spts)x.p=v});
   else if(d.cap!==undefined)S.cap=v||1;
+  else if(d.aname!==undefined){var nm=i.value.trim();if(nm)S.areas[+d.aname]=nm}
+  else if(d.aarea){S.actions.forEach(function(a){if(a.id===d.aarea)a.a=+i.value})}
+  else if(d.sarea){S.slips.forEach(function(x){if(x.id===d.sarea)x.a=+i.value})}
   else return;
   save();render();
 });
@@ -248,7 +264,7 @@ document.addEventListener("change",function(e){
   if(e.target.id!=="imp")return;
   var f=e.target.files[0];if(!f)return;var r=new FileReader();
   r.onload=function(){try{var d=JSON.parse(r.result);if(!d.actions||!d.rewards||!d.log)throw 0;
-    if(!confirm("Substituir os dados atuais pelo backup?"))return;S=d;if(!S.slips)S.slips=[];if(!S.cap)S.cap=600;save();render();alert("Backup importado.")}catch(x){alert("Arquivo inválido.")}};
+    if(!confirm("Substituir os dados atuais pelo backup?"))return;S=d;fixS();save();render();alert("Backup importado.")}catch(x){alert("Arquivo inválido.")}};
   r.readAsText(f);
 });
 if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
