@@ -93,23 +93,31 @@ actions:[
 {id:"a5",n:"Bloco de foco (90 min)",a:1,p:300},{id:"a6",n:"Postar conteúdo da marca",a:1,p:250},{id:"a7",n:"Avaliação física concluída",a:1,p:200},
 {id:"a8",n:"Tempo de qualidade em família",a:2,p:250},{id:"a9",n:"Tarefa de casa feita",a:2,p:100},{id:"a10",n:"Item do bebê resolvido",a:2,p:200}],
 rewards:[{id:"r1",n:"Jantar especial",c:4000},{id:"r2",n:"Dia livre sem culpa",c:6000},{id:"r3",n:"Presente para mim",c:9000}],
-areas:["Treino e saúde","Trabalho e negócio","Casa e família","Desenvolvimento pessoal"],slips:[{id:"s1",n:"Furar a dieta",a:0,p:100},{id:"s2",n:"Faltar ao treino",a:0,p:150},{id:"s3",n:"Noite mal dormida",a:0,p:75},{id:"s4",n:"Adiar tarefa importante",a:1,p:100}],cap:600,log:[]};
+v:2,bal0:0,areas:["Treino e saúde","Trabalho e negócio","Casa e família","Desenvolvimento pessoal"],slips:[{id:"s1",n:"Furar a dieta",a:0,p:100},{id:"s2",n:"Faltar ao treino",a:0,p:150},{id:"s3",n:"Noite mal dormida",a:0,p:75},{id:"s4",n:"Adiar tarefa importante",a:1,p:100}],cap:600,log:[]};
 var S,tab="resumo",area=-1,tabChanged=false;
 try{var raw=localStorage.getItem("tokens_v1");S=raw?JSON.parse(raw):null}catch(e){S=null}
 if(!S)S=JSON.parse(JSON.stringify(DEF));
 fixS();
-function fixS(){if(!S.slips)S.slips=JSON.parse(JSON.stringify(DEF.slips));if(!S.cap)S.cap=DEF.cap;if(!S.areas||!S.areas.length)S.areas=DEF.areas.slice();AREAS=S.areas}
+function dstr(t){var d=new Date(t);return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
+function fixS(){
+  if(S.v!==2){try{if(!localStorage.getItem("tokens_v1_backup_v1"))localStorage.setItem("tokens_v1_backup_v1",JSON.stringify(S))}catch(e){}}
+  if(!S.slips)S.slips=JSON.parse(JSON.stringify(DEF.slips));if(!S.cap)S.cap=DEF.cap;if(!S.areas||!S.areas.length)S.areas=DEF.areas.slice();AREAS=S.areas;
+  if(!Array.isArray(S.log))S.log=[];
+  if(S.v!==2){S.log.forEach(function(l){if(!l.rd)l.rd=dstr(l.t)});S.bal0=S.bal0||0;S.v=2}
+}
 function ac(i){return "var(--a"+(i%8)+")"}
 function areaOpts(sel){return AREAS.map(function(n,i){return '<option value="'+i+'"'+(i===sel?" selected":"")+'>'+esc(n)+'</option>'}).join("")}
-function save(){try{localStorage.setItem("tokens_v1",JSON.stringify(S))}catch(e){}}
+function save(){S.chk=balance();try{var j=JSON.stringify(S);localStorage.setItem("tokens_v1",j);if(localStorage.getItem("tokens_v1")!==j)throw 0}catch(e){toast("Falha ao salvar: exporte um backup agora")}}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function uid(){return "x"+Date.now().toString(36)+Math.floor(Math.random()*1e4)}
 function dkey(t){var d=new Date(t);return d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate()}
-function balance(){return S.log.reduce(function(s,l){return s+l.d},0)}
+function balance(){return (S.bal0||0)+S.log.reduce(function(s,l){return s+l.d},0)}
+function verify(){return S.chk===undefined||S.chk===balance()}
+var lockT=0;function busy(){var n=Date.now();if(n-lockT<450)return true;lockT=n;return false}
 function sumWhere(f){return S.log.filter(f).reduce(function(s,l){return s+l.d},0)}
-function monthEarned(){var n=new Date();return sumWhere(function(l){var d=new Date(l.t);return l.k==="e"&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()})}
-function todayEarned(){var k=dkey(Date.now());return sumWhere(function(l){return l.k==="e"&&dkey(l.t)===k})}
-function countToday(id){var k=dkey(Date.now());return S.log.filter(function(l){return l.k==="e"&&l.id===id&&dkey(l.t)===k}).length}
+function monthEarned(){var n=new Date();return sumWhere(function(l){var d=new Date(l.t);return l.k==="e"&&!l.rv&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()})}
+function todayEarned(){var k=dkey(Date.now());return sumWhere(function(l){return l.k==="e"&&!l.rv&&dkey(l.t)===k})}
+function countToday(id){var k=dkey(Date.now());return S.log.filter(function(l){return l.k==="e"&&!l.rv&&l.id===id&&dkey(l.t)===k}).length}
 function fmt(n){return n.toLocaleString("pt-BR")}
 function head(){
   var b=balance(),m=monthEarned(),g=Math.max(1,S.goal);
@@ -126,20 +134,20 @@ function nav(){
 var tt;function toast(m){var e=document.getElementById("toast");e.textContent=m;e.className="on";clearTimeout(tt);tt=setTimeout(function(){e.className=""},1600)}
 function vResumo(){
   var b=balance(),now=Date.now(),DAY=864e5,k=dkey(now),tg=0,tr=0;
-  S.log.forEach(function(l){if(dkey(l.t)===k){if(l.d>0)tg+=l.d;else tr-=l.d}});
+  S.log.forEach(function(l){if(dkey(l.t)===k&&!l.rv&&l.k!=="v"){if(l.d>0)tg+=l.d;else tr-=l.d}});
   var w=S.log.filter(function(l){return l.t>now-7*DAY}).reduce(function(s,l){return s+l.d},0);
   var disp=S.rewards.filter(function(r){return r.c<=b}).length;
   var res=S.log.filter(function(l){return l.k==="r"}).length;
-  var sl7=S.log.filter(function(l){return l.k==="s"&&l.t>now-7*DAY}).length,lost7=-S.log.filter(function(l){return(l.k==="s"||l.k==="j")&&l.t>now-7*DAY}).reduce(function(s,l){return s+l.d},0);
+  var sl7=S.log.filter(function(l){return l.k==="s"&&!l.rv&&l.t>now-7*DAY}).length,lost7=-S.log.filter(function(l){return(l.k==="s"||l.k==="j")&&!l.rv&&l.t>now-7*DAY}).reduce(function(s,l){return s+l.d},0);
   var days=[],mx=1;
-  for(var i=6;i>=0;i--){var t=now-i*DAY,kk=dkey(t),v=sumWhere(function(l){return l.k==="e"&&dkey(l.t)===kk});days.push({d:new Date(t).toLocaleDateString("pt-BR",{weekday:"short"}).slice(0,3),v:v});if(v>mx)mx=v}
+  for(var i=6;i>=0;i--){var t=now-i*DAY,kk=dkey(t),v=sumWhere(function(l){return l.k==="e"&&!l.rv&&dkey(l.t)===kk});days.push({d:new Date(t).toLocaleDateString("pt-BR",{weekday:"short"}).slice(0,3),v:v});if(v>mx)mx=v}
   var h='<div class="help">Seu painel: o que entrou, o que saiu e quanto falta para a próxima recompensa.</div>';
   h+='<div class="grid"><div class="stat"><small>Ganhos hoje</small><b class="pos">+'+fmt(tg)+'</b></div><div class="stat"><small>Retiradas hoje</small><b class="neg">−'+fmt(tr)+'</b></div><div class="stat"><small>Últimos 7 dias (saldo)</small><b>'+(w>0?"+":"")+fmt(w)+'</b></div><div class="stat"><small>Recompensas disponíveis</small><b>'+disp+'</b></div><div class="stat"><small>Escorregões (7 dias)</small><b>'+sl7+'</b></div><div class="stat"><small>Tokens perdidos (7 dias)</small><b class="neg">−'+fmt(lost7)+'</b></div></div>';
   var nx=S.rewards.filter(function(r){return r.c>b}).sort(function(a,c){return a.c-c.c})[0];
   h+='<div class="card"><div class="t">'+(nx?'Próxima: '+esc(nx.n)+'<small>faltam '+fmt(nx.c-b)+' tokens</small>':(S.rewards.length?'Você já pode resgatar todas as recompensas':'Crie recompensas em ⚙ Regras'))+'</div></div>';
   h+='<h3>Ganhos nos últimos 7 dias</h3><div class="card" style="display:block"><div class="bars">'+days.map(function(x){return '<div><span>'+(x.v?fmt(x.v):"")+'</span><i style="height:'+Math.round(x.v/mx*70)+'px"></i></div>'}).join("")+'</div><div class="bars" style="height:auto;margin:0">'+days.map(function(x){return '<div style="height:auto">'+x.d+'</div>'}).join("")+'</div></div>';
   var ar=AREAS.map(function(){return 0}),n=new Date();
-  S.log.forEach(function(l){var d=new Date(l.t);if(l.k==="e"&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()){var a=S.actions.filter(function(x){return x.id===l.id})[0];if(a)ar[a.a]+=l.d}});
+  S.log.forEach(function(l){var d=new Date(l.t);if(l.k==="e"&&!l.rv&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()){var a=S.actions.filter(function(x){return x.id===l.id})[0];if(a)ar[a.a]+=l.d}});
   var am=Math.max(1,Math.max.apply(null,ar));
   h+='<h3>Ganhos do mês por área</h3><div class="card" style="display:block">'+AREAS.map(function(a,i){return '<div class="ar" style="--c:'+ac(i)+'"><span>'+a+'</span><div class="bar"><i style="width:'+ar[i]/am*100+'%"></i></div><span>'+fmt(ar[i])+'</span></div>'}).join("")+'</div>';
   h+='<h3>Movimentação de hoje</h3>';
@@ -177,7 +185,7 @@ function vHis(){
   if(!S.log.length)return h+'<div class="empty">Ainda sem movimentos.</div>';
   S.log.slice().reverse().slice(0,80).forEach(function(l){
     var d=new Date(l.t),hr=d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-    h+='<div class="card"><div class="t">'+esc(l.l)+'<small>'+hr+'</small></div><span class="'+(l.d>0?"pos":"neg")+'">'+(l.d>0?"+":"")+fmt(l.d)+'</span><button class="btn g" data-undo="'+l.u+'">Desfazer</button></div>'});
+    h+='<div class="card"'+(l.rv?' style="opacity:.55"':'')+'><div class="t"><span'+(l.rv?' style="text-decoration:line-through"':'')+'>'+esc(l.l)+'</span><small>'+hr+(l.rv?" · revertido":"")+(l.k==="v"?" · correção":"")+'</small></div><span class="'+(l.d>0?"pos":"neg")+'">'+(l.d>0?"+":"")+fmt(l.d)+'</span>'+((l.rv||l.k==="v")?'':'<button class="btn g" data-undo="'+l.u+'">Desfazer</button>')+'</div>'});
   return h;
 }
 function vReg(){
@@ -196,7 +204,9 @@ function vReg(){
   h+='<h3>Recompensas e preços</h3>';
   S.rewards.forEach(function(r){h+='<div class="card"><div class="t">'+esc(r.n)+'</div><input class="n" type="number" inputmode="numeric" data-cost="'+r.id+'" value="'+r.c+'"><button class="btn g" data-delR="'+r.id+'">✕</button></div>'});
   h+='<div class="add"><input id="nR" placeholder="Nova recompensa"><input id="pR" type="number" inputmode="numeric" placeholder="Preço"><button class="btn" data-addR>Adicionar recompensa</button></div>';
-  h+='<h3>Backup dos dados</h3><div class="help">Seus dados ficam salvos neste aparelho, automaticamente. Exporte um backup de vez em quando e guarde o arquivo (Drive, WhatsApp, e-mail). Se trocar de celular, importe o arquivo.</div><div class="add"><button class="btn" data-exp>Exportar backup</button><button class="btn g" data-imp style="grid-column:1/-1;padding:10px">Importar backup</button><input id="imp" type="file" accept="application/json,.json" style="display:none"></div>';
+  h+='<h3>Backup dos dados</h3><div class="help">Seus dados ficam salvos neste aparelho, automaticamente. Exporte um backup de vez em quando e guarde o arquivo (Drive, WhatsApp, e-mail). Se trocar de celular, importe o arquivo. '+(S.lastBackup?'Último backup: '+new Date(S.lastBackup).toLocaleDateString('pt-BR')+'.':'Você ainda não exportou nenhum backup.')+'</div><div class="add"><button class="btn" data-exp>Exportar backup</button><button class="btn g" data-imp style="grid-column:1/-1;padding:10px">Importar backup</button>'+(hasPrev()?'<button class="btn g" data-restprev style="grid-column:1/-1;padding:10px">Desfazer última importação</button>':'')+'<input id="imp" type="file" accept="application/json,.json" style="display:none"></div>';
+  h+='<div class="help">Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
+  if(hasBackup())h+='<div class="add"><button class="btn g" data-recov style="grid-column:1/-1;padding:10px">Recuperar dados da versão anterior</button></div>';
   return h;
 }
 function render(){
@@ -204,26 +214,43 @@ function render(){
   m.className="";void m.offsetWidth;if(tabChanged)m.className="fade";tabChanged=false;m.innerHTML=({resumo:vResumo,hoje:vHoje,rec:vRec,his:vHis,reg:vReg})[tab]();
   head();nav();window.scrollTo(0,y);
 }
-function jokerUsed(){return S.log.some(function(l){return l.k==="j"&&l.t>Date.now()-7*864e5})}
-function lastSlip(){var a=S.log.filter(function(l){return l.k==="s"&&!l.j&&l.t>Date.now()-7*864e5});return a[a.length-1]}
+function jokerUsed(){return S.log.some(function(l){return l.k==="j"&&!l.rv&&l.t>Date.now()-7*864e5})}
+function lastSlip(){var a=S.log.filter(function(l){return l.k==="s"&&!l.j&&!l.rv&&l.t>Date.now()-7*864e5});return a[a.length-1]}
 function slip(id){var x=S.slips.filter(function(y){return y.id===id})[0];if(!x)return;var k=dkey(Date.now()),lost=0;
-  S.log.forEach(function(l){if(dkey(l.t)===k&&(l.k==="s"||l.k==="j"))lost-=l.d});
+  S.log.forEach(function(l){if(dkey(l.t)===k&&!l.rv&&(l.k==="s"||l.k==="j"))lost-=l.d});
   var b=balance(),amt=Math.min(x.p,Math.max(0,(S.cap||600)-lost),Math.max(0,b));
   if(amt<=0){toast(b<=0?"Saldo já está zerado":"Limite diário de perda atingido");return}
-  push("s","Escorregão: "+x.n,-amt);if(navigator.vibrate)navigator.vibrate([20,40,20]);toast("−"+fmt(amt)+" tokens"+(amt<x.p?" (limitado)":""))}
+  push("s","Escorregão: "+x.n,-amt,x.id);if(navigator.vibrate)navigator.vibrate([20,40,20]);toast("−"+fmt(amt)+" tokens"+(amt<x.p?" (limitado)":""))}
 function joker(){var u=lastSlip();if(jokerUsed()||!u)return;push("j","Coringa anulou: "+u.l.replace("Escorregão: ",""),-u.d);S.log[S.log.length-1].ref=u.u;u.j=true;toast("Coringa usado · +"+fmt(-u.d)+" tokens")}
-function undoLog(u){var e=S.log.filter(function(l){return l.u===u})[0];if(!e)return;
+function hasBackup(){try{return !!localStorage.getItem("tokens_v1_backup_v1")}catch(e){return false}}
+function validate(d){if(!d||typeof d!=="object"||Array.isArray(d))return "estrutura inválida";
+  if(!Array.isArray(d.actions)||!Array.isArray(d.rewards)||!Array.isArray(d.log))return "faltam ações, recompensas ou histórico";
+  if(d.v&&d.v>2)return "gerado por uma versão mais nova do app";
+  var seen={},sum=0;for(var i=0;i<d.log.length;i++){var l=d.log[i];
+    if(!l||typeof l.u!=="string"||typeof l.k!=="string"||typeof l.d!=="number"||typeof l.t!=="number")return "movimentação inválida (nº "+(i+1)+")";
+    if(seen[l.u])return "movimentação duplicada (nº "+(i+1)+")";seen[l.u]=1;sum+=l.d}
+  if(typeof d.chk==="number"&&d.chk!==sum)return "o saldo do arquivo não confere com o histórico";return ""}
+function hasPrev(){try{return !!localStorage.getItem("tokens_v1_prev")}catch(e){return false}}
+function restprev(){var p;try{p=JSON.parse(localStorage.getItem("tokens_v1_prev"))}catch(e){p=null}
+  if(!p||validate(p)){alert("A cópia anterior não está disponível ou está inválida.");return}
+  if(!confirm("Voltar aos dados de antes da última importação ("+p.log.length+" movimentações)? Os dados atuais ficam guardados para você poder voltar."))return;
+  var cur=JSON.stringify(S);S=p;fixS();try{localStorage.setItem("tokens_v1_prev",cur)}catch(e){}save();render();toast("Dados anteriores restaurados")}
+function recover(){try{var b=localStorage.getItem("tokens_v1_backup_v1");if(!b)return;if(!confirm("Substituir os dados atuais pela cópia salva antes da atualização?"))return;S=JSON.parse(b);fixS();save();render();toast("Dados recuperados")}catch(e){toast("Não foi possível recuperar")}}
+function rev(e){S.log.push({u:uid(),t:Date.now(),rd:e.rd||dstr(Date.now()),k:"v",l:(e.k==="r"?"Estorno: ":"Reversão: ")+e.l,d:-e.d,id:e.id||"",ref:e.ref||"",orig:e.u});e.rv=true}
+function undoLog(u){var e=S.log.filter(function(l){return l.u===u})[0];if(!e||e.rv||e.k==="v")return false;
+  if(e.d>0&&balance()-e.d<0){toast("Saldo ficaria negativo: não dá para desfazer");return false}
+  if(e.k==="s"&&e.j){S.log.forEach(function(l){if(l.k==="j"&&l.ref===e.u&&!l.rv)rev(l)});delete e.j}
   if(e.k==="j")S.log.forEach(function(l){if(l.u===e.ref)delete l.j});
-  if(e.k==="s")S.log=S.log.filter(function(l){return l.ref!==e.u});
-  S.log=S.log.filter(function(l){return l.u!==u})}
-function push(k,l,d,id){S.log.push({u:uid(),t:Date.now(),k:k,l:l,d:d,id:id||""})}
+  rev(e);return true}
+function push(k,l,d,id){S.log.push({u:uid(),t:Date.now(),rd:dstr(Date.now()),k:k,l:l,d:d,id:id||""})}
 document.addEventListener("click",function(e){
   var t=e.target.closest("button");if(!t)return;var d=t.dataset;
+  if((d.earn||d.redeem||d.slip||d.joker!==undefined||d.undo)&&busy())return;
   if(d.tab){tab=d.tab;tabChanged=true;window.scrollTo(0,0)}
   else if(d.area!==undefined){area=+d.area}
   else if(d.earn){var a=S.actions.filter(function(x){return x.id===d.earn})[0];push("e",a.n,a.p,a.id);if(navigator.vibrate)navigator.vibrate(12);toast("+"+fmt(a.p)+" tokens · salvo")}
-  else if(d.redeem){var r=S.rewards.filter(function(x){return x.id===d.redeem})[0];if(balance()<r.c)return;push("r","Resgate: "+r.n,-r.c);toast("Resgatado: "+r.n)}
-  else if(d.undo){undoLog(d.undo);toast("Desfeito")}
+  else if(d.redeem){var r=S.rewards.filter(function(x){return x.id===d.redeem})[0];if(!r||!r.c)return;var b0=balance();if(b0<r.c){toast("Saldo insuficiente: faltam "+fmt(r.c-b0)+" tokens");return}if(!confirm("Resgatar \""+r.n+"\" por "+fmt(r.c)+" tokens?\n\nSaldo atual: "+fmt(b0)+"\nSaldo depois: "+fmt(b0-r.c)))return;if(balance()<r.c)return;push("r","Resgate: "+r.n,-r.c,r.id);toast("Resgatado: "+r.n)}
+  else if(d.undo){if(undoLog(d.undo))toast("Desfeito")}
   else if(d.addarea!==undefined){var nn=document.getElementById("nAr").value.trim();if(!nn)return;S.areas.push(nn)}
   else if(d.delarea!==undefined){var di=+d.delarea;
     if(S.areas.length<=1){toast("Precisa ter ao menos uma área");return}
@@ -256,16 +283,20 @@ document.addEventListener("change",function(e){
 document.addEventListener("click",function(e){
   var t=e.target.closest("button");if(!t)return;
   if(t.dataset.exp!==undefined){
-    var b=new Blob([JSON.stringify(S)],{type:"application/json"}),a=document.createElement("a");
+    S.lastBackup=Date.now();save();var b=new Blob([JSON.stringify(Object.assign({app:"merito",exportedAt:new Date().toISOString()},S))],{type:"application/json"}),a=document.createElement("a");
     a.href=URL.createObjectURL(b);a.download="tokens-backup-"+new Date().toISOString().slice(0,10)+".json";
     document.body.appendChild(a);a.click();a.remove();
-  }else if(t.dataset.imp!==undefined){document.getElementById("imp").click()}
+  }else if(t.dataset.imp!==undefined){document.getElementById("imp").click()}else if(t.dataset.recov!==undefined){recover()}else if(t.dataset.restprev!==undefined){restprev()}
 });
 document.addEventListener("change",function(e){
   if(e.target.id!=="imp")return;
   var f=e.target.files[0];if(!f)return;var r=new FileReader();
-  r.onload=function(){try{var d=JSON.parse(r.result);if(!d.actions||!d.rewards||!d.log)throw 0;
-    if(!confirm("Substituir os dados atuais pelo backup?"))return;S=d;fixS();save();render();alert("Backup importado.")}catch(x){alert("Arquivo inválido.")}};
+  r.onload=function(){var d;try{d=JSON.parse(r.result)}catch(x){alert("Arquivo inválido: não é um backup do Mérito.");return}
+    var er=validate(d);if(er){alert("Backup recusado: "+er+".\nSeus dados atuais não foram alterados.");return}
+    var bal=d.log.reduce(function(a,l){return a+l.d},0);
+    if(!confirm("Backup com "+d.log.length+" movimentações, "+d.actions.length+" ações e "+d.rewards.length+" recompensas.\nSaldo: "+fmt(bal)+" tokens.\n\nIsto SUBSTITUI os dados atuais. Uma cópia dos atuais fica guardada. Continuar?"))return;
+    try{localStorage.setItem("tokens_v1_prev",JSON.stringify(S))}catch(x){alert("Não foi possível guardar a cópia de segurança. Importação cancelada.");return}
+    delete d.app;delete d.exportedAt;S=d;fixS();save();render();toast("Backup importado")};
   r.readAsText(f);
 });
 if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
