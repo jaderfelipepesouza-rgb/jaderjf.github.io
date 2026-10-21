@@ -92,6 +92,18 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 @keyframes f{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 main.fade{animation:f .22s ease}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.prog{flex-basis:100%;border-top:1px solid var(--bd);margin-top:2px;padding-top:4px}
+.prog summary{font-size:13px;color:var(--mu);padding:8px 0;cursor:pointer;list-style:none}
+.prog summary::-webkit-details-marker{display:none}
+.prog summary::after{content:" ▾";color:var(--acd)}
+.prog .dow{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 10px}
+.prog .dw{width:38px;height:38px;border-radius:50%;padding:0;font:700 13px/1 var(--f);border:1px solid var(--bd);background:var(--soft);color:var(--mu)}
+.prog .dw.on{background:var(--ac);color:var(--onac);border-color:transparent}
+.prog .wkr{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 10px;font-size:13.5px;font-weight:600}
+.prog .wkr small{display:block;color:var(--mu);font-size:12px;font-weight:500}
+.prog .wkr input{width:72px;height:42px;flex:none}
+.prog .opt{display:flex;gap:8px}
+.prog .opt .btn{flex:1;min-width:0;padding:11px 12px;font-size:13px}
 </style>
 </head>
 <body>
@@ -146,8 +158,10 @@ function calHtml(){var p=cm.split("-"),y=+p[0],m=+p[1]-1,f=new Date(y,m,1),n=new
   for(var i=0;i<f.getDay();i++)h+="<span></span>";
   for(var d=1;d<=n;d++){var x=y+"-"+("0"+(m+1)).slice(-2)+"-"+("0"+d).slice(-2);h+='<button class="cd'+(x===sel?" sel":"")+(x===td?" td":"")+'" data-day="'+x+'" aria-label="Dia '+d+'"><span>'+d+'</span><em>'+sy[dayState(x)]+'</em></button>'}
   return h+'</div><div class="leg">● concluído · ◐ parcial · ○ pendente</div></div>'}
+var OP={};
+function progSum(a){var N=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"],t=a.wk>0?a.wk+"× por semana":((a.days&&a.days.length&&a.days.length<7)?a.days.map(function(i){return N[i]}).join(", "):"Todos os dias");return "Programação · "+t+(a.once?" · 1× por dia":"")+(a.on===false?" · inativa":"")}
 function recurHtml(a){var D=["D","S","T","Q","Q","S","S"],ds=a.days||[];
-  return '<div class="dow">'+D.map(function(x,i){var on=!ds.length||ds.indexOf(i)>-1;return '<button class="dw'+(on?" on":"")+'" data-dow="'+a.id+':'+i+'" aria-pressed="'+on+'">'+x+'</button>'}).join("")+'</div><div class="opt"><span style="font-size:12px;color:var(--mu);flex:1">Meta semanal (0 = usar os dias marcados)</span><input class="n" type="number" inputmode="numeric" data-wk="'+a.id+'" value="'+(a.wk||0)+'" aria-label="Vezes por semana"><button class="btn g" data-actv="'+a.id+'">'+(a.on===false?"Inativa":"Ativa")+'</button><button class="btn g" data-once="'+a.id+'">'+(a.once?"1× por dia":"Repetível")+'</button></div>'}
+  return '<div class="dow" role="group" aria-label="Dias da semana">'+D.map(function(x,i){var on=!ds.length||ds.indexOf(i)>-1;return '<button class="dw'+(on?" on":"")+'" data-dow="'+a.id+':'+i+'" aria-pressed="'+on+'">'+x+'</button>'}).join("")+'</div><div class="wkr"><div>Meta semanal<small>0 = usar os dias marcados</small></div><input class="n" type="number" inputmode="numeric" data-wk="'+a.id+'" value="'+(a.wk||0)+'" aria-label="Vezes por semana"></div><div class="opt"><button class="btn g" data-actv="'+a.id+'">'+(a.on===false?"Inativa":"Ativa")+'</button><button class="btn g" data-once="'+a.id+'">'+(a.once?"1× por dia":"Repetível")+'</button></div>'}
 function dkey(t){var d=new Date(t);return d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate()}
 var RO={};function mkRO(){RO={};S.log.forEach(function(l){if(l.k==="v"&&l.orig)RO[l.orig]=1})}
 function rvd(l){return !!(l.rv||RO[l.u])}
@@ -238,7 +252,7 @@ function vReg(){
   S.areas.forEach(function(n,i){h+='<div class="card" style="--c:'+ac(i)+'"><div class="t"><input class="txt" data-aname="'+i+'" value="'+esc(n)+'"></div><button class="btn g" data-delarea="'+i+'">✕</button></div>'});
   h+='<div class="add"><input id="nAr" placeholder="Nova área (ex.: Leitura)" style="grid-column:1/-1"><button class="btn" data-addarea>Adicionar área</button></div>';
   h+='<h3>Ações e pesos</h3>';
-  S.actions.forEach(function(a){h+='<div class="card"><div class="t">'+esc(a.n)+'<select class="sel" data-aarea="'+a.id+'">'+areaOpts(a.a)+'</select>'+recurHtml(a)+'</div><input class="n" type="number" inputmode="numeric" data-pts="'+a.id+'" value="'+a.p+'"><button class="btn g" data-delA="'+a.id+'">✕</button></div>'});
+  S.actions.forEach(function(a){h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(a.n)+'<select class="sel" data-aarea="'+a.id+'">'+areaOpts(a.a)+'</select></div><input class="n" type="number" inputmode="numeric" data-pts="'+a.id+'" value="'+a.p+'"><button class="btn g" data-delA="'+a.id+'">✕</button><details class="prog" data-prog="'+a.id+'"'+(OP[a.id]?' open':'')+'><summary>'+progSum(a)+'</summary>'+recurHtml(a)+'</details></div>'});
   h+='<div class="add"><input id="nA" placeholder="Nova ação"><input id="pA" type="number" inputmode="numeric" placeholder="Peso"><select id="aA">'+AREAS.map(function(a,i){return '<option value="'+i+'">'+a+'</option>'}).join("")+'</select><button class="btn" data-addA>Adicionar ação</button></div>';
   h+='<h3>Escorregões e perdas</h3>';
   S.slips.forEach(function(x){h+='<div class="card"><div class="t">'+esc(x.n)+'<select class="sel" data-sarea="'+x.id+'">'+areaOpts(x.a)+'</select></div><input class="n" type="number" inputmode="numeric" data-spts="'+x.id+'" value="'+x.p+'"><button class="btn g" data-dels="'+x.id+'">✕</button></div>'});
@@ -248,7 +262,7 @@ function vReg(){
   S.rewards.forEach(function(r){h+='<div class="card"><div class="t">'+esc(r.n)+'</div><input class="n" type="number" inputmode="numeric" data-cost="'+r.id+'" value="'+r.c+'"><button class="btn g" data-delR="'+r.id+'">✕</button></div>'});
   h+='<div class="add"><input id="nR" placeholder="Nova recompensa"><input id="pR" type="number" inputmode="numeric" placeholder="Preço"><button class="btn" data-addR>Adicionar recompensa</button></div>';
   h+='<h3>Backup dos dados</h3><div class="help">Seus dados ficam salvos neste aparelho, automaticamente. Exporte um backup de vez em quando e guarde o arquivo (Drive, WhatsApp, e-mail). Se trocar de celular, importe o arquivo. '+(S.lastBackup?'Último backup: '+new Date(S.lastBackup).toLocaleDateString('pt-BR')+'.':'Você ainda não exportou nenhum backup.')+'</div><div class="add"><button class="btn" data-exp>Exportar backup</button><button class="btn g" data-imp style="grid-column:1/-1;padding:10px">Importar backup</button>'+(hasPrev()?'<button class="btn g" data-restprev style="grid-column:1/-1;padding:10px">Desfazer última importação</button>':'')+'<input id="imp" type="file" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="help">Versão 2.2 · Versão 2.2 · Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
+  h+='<div class="help">Versão 2.3 · Versão 2.2 · Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
   if(hasBackup())h+='<div class="add"><button class="btn g" data-recov style="grid-column:1/-1;padding:10px">Recuperar dados da versão anterior</button></div>';
   return h;
 }
@@ -359,6 +373,7 @@ document.addEventListener("change",function(e){
     delete d.app;delete d.exportedAt;S=d;fixS();save();render();toast("Backup importado")};
   r.readAsText(f);
 });
+document.addEventListener("toggle",function(e){var t=e.target;if(t&&t.dataset&&t.dataset.prog)OP[t.dataset.prog]=t.open},true);
 if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("controllerchange",function(){if(!window.__rl){window.__rl=1;location.reload()}});window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
 render();
 </script>
