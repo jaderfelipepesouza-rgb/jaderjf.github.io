@@ -282,7 +282,8 @@ function vReg(){
   h+='<h3>Recompensas e preços</h3>';
   h+=rewReg();
   h+='<h3>Backup dos dados</h3><div class="help">Seus dados ficam salvos neste aparelho, automaticamente. Exporte um backup de vez em quando e guarde o arquivo (Drive, WhatsApp, e-mail). Se trocar de celular, importe o arquivo. '+(S.lastBackup?'Último backup: '+new Date(S.lastBackup).toLocaleDateString('pt-BR')+'.':'Você ainda não exportou nenhum backup.')+'</div><div class="add"><button class="btn" data-exp>Exportar backup</button><button class="btn g" data-imp style="grid-column:1/-1;padding:10px">Importar backup</button>'+(hasPrev()?'<button class="btn g" data-restprev style="grid-column:1/-1;padding:10px">Desfazer última importação</button>':'')+'<input id="imp" type="file" accept="application/json,.json" style="display:none"></div>';
-  h+='<div class="help">Versão 2.4 · Versão 2.2 · Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
+  h+='<button class="btn g" data-hardrefresh style="margin:0 0 10px">Atualizar o app agora</button>';
+  h+='<div class="help">Versão 2.5 · Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
   if(hasBackup())h+='<div class="add"><button class="btn g" data-recov style="grid-column:1/-1;padding:10px">Recuperar dados da versão anterior</button></div>';
   return h;
 }
@@ -312,6 +313,10 @@ function restprev(){var p;try{p=JSON.parse(localStorage.getItem("tokens_v1_prev"
   if(!p||validate(p)){alert("A cópia anterior não está disponível ou está inválida.");return}
   if(!confirm("Voltar aos dados de antes da última importação ("+p.log.length+" movimentações)? Os dados atuais ficam guardados para você poder voltar."))return;
   var cur=JSON.stringify(S);S=p;fixS();try{localStorage.setItem("tokens_v1_prev",cur)}catch(e){}save();render();toast("Dados anteriores restaurados")}
+function hardRefresh(){toast("Atualizando…");var p=[];
+  if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister()}))}));
+  if(window.caches)p.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x)}))}));
+  Promise.all(p).catch(function(){}).then(function(){location.reload()})}
 function recover(){try{var b=localStorage.getItem("tokens_v1_backup_v1");if(!b)return;if(!confirm("Substituir os dados atuais pela cópia salva antes da atualização?"))return;S=JSON.parse(b);fixS();save();render();toast("Dados recuperados")}catch(e){toast("Não foi possível recuperar")}}
 function rev(e){S.log.push({u:uid(),t:Date.now(),rd:e.rd||dstr(Date.now()),k:"v",l:(e.k==="r"?"Estorno: ":"Reversão: ")+e.l,d:-e.d,id:e.id||"",ref:e.ref||"",orig:e.u});e.rv=true;RO[e.u]=1}
 function undoLog(u){var e=S.log.filter(function(l){return l.u===u})[0];if(!e||rvd(e)||e.k==="v")return false;
@@ -392,6 +397,7 @@ document.addEventListener("click",function(e){
     a.href=URL.createObjectURL(b);a.download="tokens-backup-"+new Date().toISOString().slice(0,10)+".json";
     document.body.appendChild(a);a.click();a.remove();
   }else if(t.dataset.imp!==undefined){document.getElementById("imp").click()}else if(t.dataset.recov!==undefined){recover()}else if(t.dataset.restprev!==undefined){restprev()}
+  else if(t.dataset.hardrefresh!==undefined){hardRefresh()}
   else if(t.dataset.rx!==undefined){var cd=t.closest(".card"),dd=cd&&cd.querySelector(".dsc");if(dd){var op=dd.classList.toggle("open");t.setAttribute("aria-expanded",op);RX[t.dataset.rx]=op}}
 });
 document.addEventListener("change",function(e){
