@@ -111,6 +111,7 @@ main.fade{animation:f .22s ease}
 .dsc.open>div{padding-top:6px;border-top:1px solid var(--bd);margin-top:4px}
 .rd{width:100%;resize:vertical;margin:6px 0}
 .prog select{max-width:190px}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.filters label{flex:1;min-width:120px;font-size:12px}.filters input,.filters select{display:block;width:100%}.card{flex-wrap:wrap}.card .t{overflow-wrap:anywhere;min-width:120px}textarea{font:inherit;color:var(--tx);background:var(--soft);border:1px solid var(--bd);border-radius:10px;padding:10px}summary,button{cursor:pointer}button{min-height:44px}.ib{width:32px;height:32px;min-height:32px}#toast{white-space:normal;text-align:center;max-width:calc(100vw - 24px);width:max-content}.dw.on{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -127,10 +128,14 @@ actions:[
 {id:"a8",n:"Tempo de qualidade em família",a:2,p:250},{id:"a9",n:"Tarefa de casa feita",a:2,p:100},{id:"a10",n:"Item do bebê resolvido",a:2,p:200}],
 rewards:[{id:"r1",n:"Jantar especial",c:4000},{id:"r2",n:"Dia livre sem culpa",c:6000},{id:"r3",n:"Presente para mim",c:9000}],
 v:2,bal0:0,areas:["Treino e saúde","Trabalho e negócio","Casa e família","Desenvolvimento pessoal"],slips:[{id:"s1",n:"Furar a dieta",a:0,p:100},{id:"s2",n:"Faltar ao treino",a:0,p:150},{id:"s3",n:"Noite mal dormida",a:0,p:75},{id:"s4",n:"Adiar tarefa importante",a:1,p:100}],cap:600,log:[]};
+var durable=null,storageBlocked=false;
 var S,tab="resumo",area=-1,tabChanged=false;
-try{var raw=localStorage.getItem("tokens_v1");S=raw?JSON.parse(raw):null}catch(e){S=null}
+try{var raw=localStorage.getItem("tokens_v1");S=raw?JSON.parse(raw):null}catch(e){storageBlocked=true;S=null}
+if(raw&&!S)storageBlocked=true;
 if(!S)S=JSON.parse(JSON.stringify(DEF));
-fixS();
+try{fixS()}catch(e){storageBlocked=true;S=JSON.parse(JSON.stringify(DEF));fixS()}
+try{var initial=localStorage.getItem("tokens_v1");if(initial){if(validate(S)){storageBlocked=true;S=JSON.parse(JSON.stringify(DEF));fixS()}else if(!localStorage.getItem("tokens_v1_before_2_6"))localStorage.setItem("tokens_v1_before_2_6",initial)}}catch(e){storageBlocked=true}
+durable=JSON.stringify(S);
 function dstr(t){var d=new Date(t);return d.getFullYear()+"-"+("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2)}
 function fixS(){if(!S.cats)S.cats=["Pequeno mimo","Compra desejada","Compra especial","Grande recompensa"];
   
@@ -141,16 +146,24 @@ function fixS(){if(!S.cats)S.cats=["Pequeno mimo","Compra desejada","Compra espe
 }
 function ac(i){return "var(--a"+(i%8)+")"}
 function areaOpts(sel){return AREAS.map(function(n,i){return '<option value="'+i+'"'+(i===sel?" selected":"")+'>'+esc(n)+'</option>'}).join("")}
-function save(){S.chk=balance();try{var j=JSON.stringify(S);localStorage.setItem("tokens_v1",j);if(localStorage.getItem("tokens_v1")!==j)throw 0}catch(e){toast("Falha ao salvar: exporte um backup agora")}}
+function save(){
+  if(storageBlocked){S=JSON.parse(durable);fixS();toast("Gravação bloqueada: preserve o backup e recupere os dados");return false}
+  try{var current=localStorage.getItem("tokens_v1");
+    if(window.persisted!==undefined&&current!==window.persisted)throw new Error("another-tab");
+    S.chk=balance();var er=validate(S);if(er)throw new Error(er);
+    var j=JSON.stringify(S);localStorage.setItem("tokens_v1",j);
+    durable=j;window.persisted=j;return true;
+  }catch(e){S=JSON.parse(durable);fixS();mkRO();toast(e.message==="another-tab"?"Dados mudaram em outra aba. Reabra antes de continuar.":"Não foi salvo. Operação cancelada; exporte um backup.");return false}
+}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
-function uid(){return "x"+Date.now().toString(36)+Math.floor(Math.random()*1e4)}
+function uid(){return crypto.randomUUID?crypto.randomUUID():"x"+Date.now().toString(36)+Math.random().toString(36).slice(2)}
 var sel=dstr(Date.now()),calOpen=false,cm=sel.slice(0,7),showAll=false;
 function rdOf(l){return l.rd||dstr(l.t)}
 function fmtD(x){return new Date(x+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}
 function addD(x,n){var d=new Date(x+"T12:00:00");d.setDate(d.getDate()+n);return dstr(d.getTime())}
 function weekStart(x){var d=new Date(x+"T12:00:00");d.setDate(d.getDate()-d.getDay());return dstr(d.getTime())}
 function weekCount(id,x){var w0=weekStart(x),w1=addD(w0,6);return S.log.filter(function(l){var r=rdOf(l);return l.k==="e"&&!rvd(l)&&l.id===id&&r>=w0&&r<=w1}).length}
-function sched(a,x){if(a.on===false)return false;if(a.wk>0)return weekCount(a.id,x)<a.wk||countOn(x,a.id)>0;var w=new Date(x+"T12:00:00").getDay();return !a.days||!a.days.length||a.days.indexOf(w)>-1}
+function sched(a,x){a=taskAt(a,x);if(a.on===false)return false;if(a.wk>0)return weekCount(a.id,x)<a.wk||countOn(x,a.id)>0;var w=new Date(x+"T12:00:00").getDay();return !a.days||!a.days.length||a.days.indexOf(w)>-1}
 function countOn(x,id){return S.log.filter(function(l){return l.k==="e"&&!rvd(l)&&l.id===id&&rdOf(l)===x}).length}
 function earnedOn(x){return S.log.filter(function(l){return l.k==="e"&&!rvd(l)&&rdOf(l)===x}).reduce(function(s,l){return s+l.d},0)}
 function dayState(x){var sc=S.actions.filter(function(a){return !a.wk&&sched(a,x)}),dn=sc.filter(function(a){return countOn(x,a.id)>0}).length,any=earnedOn(x)>0;
@@ -166,10 +179,13 @@ function calHtml(){var p=cm.split("-"),y=+p[0],m=+p[1]-1,f=new Date(y,m,1),n=new
   for(var i=0;i<f.getDay();i++)h+="<span></span>";
   for(var d=1;d<=n;d++){var x=y+"-"+("0"+(m+1)).slice(-2)+"-"+("0"+d).slice(-2);h+='<button class="cd'+(x===sel?" sel":"")+(x===td?" td":"")+'" data-day="'+x+'" aria-label="Dia '+d+'"><span>'+d+'</span><em>'+sy[dayState(x)]+'</em></button>'}
   return h+'</div><div class="leg">● concluído · ◐ parcial · ○ pendente</div></div>'}
+function taskAt(a,x){var versions=a.versions||[];var v=versions.filter(function(v){return v.from<=x}).pop();return v?Object.assign({},a,v.value):a}
+function snapshotTask(a){var c=JSON.parse(JSON.stringify(a));delete c.versions;return c}
+function rememberTask(a,before){if(!a.versions)a.versions=[{from:"1900-01-01",value:before}];a.versions.push({from:dstr(Date.now()),value:snapshotTask(a)})}
 var OP={};
 function progSum(a){var N=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"],t=a.wk>0?a.wk+"× por semana":((a.days&&a.days.length&&a.days.length<7)?a.days.map(function(i){return N[i]}).join(", "):"Todos os dias");return "Programação · "+t+(a.once?" · 1× por dia":"")+(a.on===false?" · inativa":"")}
 function recurHtml(a){var D=["D","S","T","Q","Q","S","S"],ds=a.days||[];
-  return '<div class="dow" role="group" aria-label="Dias da semana">'+D.map(function(x,i){var on=!ds.length||ds.indexOf(i)>-1;return '<button class="dw'+(on?" on":"")+'" data-dow="'+a.id+':'+i+'" aria-pressed="'+on+'">'+x+'</button>'}).join("")+'</div><div class="wkr"><div>Meta semanal<small>0 = usar os dias marcados</small></div><input class="n" type="number" inputmode="numeric" data-wk="'+a.id+'" value="'+(a.wk||0)+'" aria-label="Vezes por semana"></div><div class="opt"><button class="btn g" data-actv="'+a.id+'">'+(a.on===false?"Inativa":"Ativa")+'</button><button class="btn g" data-once="'+a.id+'">'+(a.once?"1× por dia":"Repetível")+'</button></div>'}
+  return '<label>Nome <input class="txt" data-taskname="'+a.id+'" value="'+esc(a.n)+'"></label><div class="dow" role="group" aria-label="Dias da semana">'+D.map(function(x,i){var on=!ds.length||ds.indexOf(i)>-1;return '<button class="dw'+(on?" on":"")+'" data-dow="'+a.id+':'+i+'" aria-pressed="'+on+'">'+x+'</button>'}).join("")+'</div><div class="wkr"><div>Meta semanal<small>0 = usar os dias marcados</small></div><input class="n" type="number" inputmode="numeric" data-wk="'+a.id+'" value="'+(a.wk||0)+'" aria-label="Vezes por semana"></div><div class="opt"><button class="btn g" data-actv="'+a.id+'">'+(a.on===false?"Inativa":"Ativa")+'</button><button class="btn g" data-once="'+a.id+'">'+(a.once?"1× por dia":"Repetível")+'</button></div>'}
 function dkey(t){var d=new Date(t);return d.getFullYear()+"-"+d.getMonth()+"-"+d.getDate()}
 var RO={};function mkRO(){RO={};S.log.forEach(function(l){if(l.k==="v"&&l.orig)RO[l.orig]=1})}
 function rvd(l){return !!(l.rv||RO[l.u])}
@@ -199,7 +215,7 @@ function vResumo(){
   S.log.forEach(function(l){if((l.k==="e"?rdOf(l)===dstr(now):dkey(l.t)===k)&&!rvd(l)&&l.k!=="v"){if(l.d>0)tg+=l.d;else tr-=l.d}});
   var w=S.log.filter(function(l){return l.t>now-7*DAY}).reduce(function(s,l){return s+l.d},0);
   var disp=actRw().filter(function(r){return r.c<=b}).length;
-  var res=S.log.filter(function(l){return l.k==="r"}).length;
+  var res=S.log.filter(function(l){return l.k==="r"&&!rvd(l)}).length;
   var sl7=S.log.filter(function(l){return l.k==="s"&&!rvd(l)&&l.t>now-7*DAY}).length,lost7=-S.log.filter(function(l){return(l.k==="s"||l.k==="j")&&!rvd(l)&&l.t>now-7*DAY}).reduce(function(s,l){return s+l.d},0);
   var days=[],mx=1;
   for(var i=6;i>=0;i--){var t=now-i*DAY,kk=dstr(t),v=earnedOn(kk);days.push({d:new Date(t).toLocaleDateString("pt-BR",{weekday:"short"}).slice(0,3),v:v});if(v>mx)mx=v}
@@ -209,9 +225,9 @@ function vResumo(){
   h+='<div class="card"><div class="t">'+(nx?'Próxima: '+esc(nx.n)+'<small>faltam '+fmt(nx.c-b)+' tokens</small>':(actRw().length?'Você já pode resgatar todas as recompensas':'Crie recompensas em ⚙ Regras'))+'</div></div>';
   h+='<h3>Ganhos nos últimos 7 dias</h3><div class="card" style="display:block"><div class="bars">'+days.map(function(x){return '<div><span>'+(x.v?fmt(x.v):"")+'</span><i style="height:'+Math.round(x.v/mx*70)+'px"></i></div>'}).join("")+'</div><div class="bars" style="height:auto;margin:0">'+days.map(function(x){return '<div style="height:auto">'+x.d+'</div>'}).join("")+'</div></div>';
   var ar=AREAS.map(function(){return 0}),n=new Date();
-  S.log.forEach(function(l){var d=new Date(rdOf(l)+"T12:00:00");if(l.k==="e"&&!rvd(l)&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()){var a=S.actions.filter(function(x){return x.id===l.id})[0];if(a)ar[a.a]+=l.d}});
+  S.log.forEach(function(l){var d=new Date(rdOf(l)+"T12:00:00");if(l.k==="e"&&!rvd(l)&&d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear()){var ix=AREAS.indexOf(l.area);if(ix>=0)ar[ix]+=l.d}});
   var am=Math.max(1,Math.max.apply(null,ar));
-  h+='<h3>Ganhos do mês por área</h3><div class="card" style="display:block">'+AREAS.map(function(a,i){return '<div class="ar" style="--c:'+ac(i)+'"><span>'+a+'</span><div class="bar"><i style="width:'+ar[i]/am*100+'%"></i></div><span>'+fmt(ar[i])+'</span></div>'}).join("")+'</div>';
+  h+='<h3>Ganhos do mês por área</h3><div class="card" style="display:block">'+AREAS.map(function(a,i){return '<div class="ar" style="--c:'+ac(i)+'"><span>'+esc(a)+'</span><div class="bar"><i style="width:'+ar[i]/am*100+'%"></i></div><span>'+fmt(ar[i])+'</span></div>'}).join("")+'</div>';
   h+='<h3>Movimentação de hoje</h3>';
   var td=S.log.filter(function(l){return dkey(l.t)===k}).reverse();
   if(!td.length)h+='<div class="empty">Nada hoje ainda. Vá em ✓ Hoje e comece.</div>';
@@ -222,10 +238,10 @@ function vResumo(){
 function vHoje(){
   var h=dateBar();
   h+='<div class="help">Toque em + para registrar. Use ‹ › ou o calendário para registrar um dia anterior. Toque no contador (2× ↶) para desfazer o último.</div>';
-  h+='<div class="chips"><button class="chip'+(area<0?" on":"")+'" data-area="-1">Todas</button>'+AREAS.map(function(a,i){return '<button class="chip'+(area===i?" on":"")+'" data-area="'+i+'"><i style="--c:'+ac(i)+'"></i>'+a+'</button>'}).join("")+'</div>';
+  h+='<div class="chips"><button class="chip'+(area<0?" on":"")+'" data-area="-1">Todas</button>'+AREAS.map(function(a,i){return '<button class="chip'+(area===i?" on":"")+'" data-area="'+i+'"><i style="--c:'+ac(i)+'"></i>'+esc(a)+'</button>'}).join("")+'</div>';
   var l=S.actions.filter(function(a){return (area<0||a.a===area)&&(showAll||sched(a,sel)||countOn(sel,a.id)>0)});
   if(!l.length)h+='<div class="empty">Nenhuma ação prevista para este dia.</div>';
-  l.forEach(function(a){var c=countOn(sel,a.id),dn=a.once&&c>0;
+  l.forEach(function(a){a=taskAt(a,sel);var c=countOn(sel,a.id),dn=a.once&&c>0;
     h+='<div class="card" style="--c:'+ac(a.a)+'"><div class="t">'+esc(a.n)+(c?'<button class="badge" data-undolast="'+a.id+'" aria-label="Desfazer o último registro">'+c+'× ↶</button>':"")+'<small>'+AREAS[a.a]+(a.wk?" · "+weekCount(a.id,sel)+" de "+a.wk+" na semana":"")+(a.on===false?" · inativa":"")+'</small></div><button class="btn'+(dn?" off":"")+'" data-earn="'+a.id+'">'+(dn?"Feito":"+"+fmt(a.p))+'</button></div>'});
   h+='<button class="btn g" data-showall style="margin:2px 0 8px">'+(showAll?"Mostrar só as previstas":"Mostrar outras ações")+'</button>';
   if(sel!==dstr(Date.now()))return h;
@@ -274,22 +290,23 @@ function vReg(){
   h+='<div class="add"><input id="nAr" placeholder="Nova área (ex.: Leitura)" style="grid-column:1/-1"><button class="btn" data-addarea>Adicionar área</button></div>';
   h+='<h3>Ações e pesos</h3>';
   S.actions.forEach(function(a){h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(a.n)+'<select class="sel" data-aarea="'+a.id+'">'+areaOpts(a.a)+'</select></div><input class="n" type="number" inputmode="numeric" data-pts="'+a.id+'" value="'+a.p+'"><button class="btn g" data-delA="'+a.id+'">✕</button><details class="prog" data-prog="'+a.id+'"'+(OP[a.id]?' open':'')+'><summary>'+progSum(a)+'</summary>'+recurHtml(a)+'</details></div>'});
-  h+='<div class="add"><input id="nA" placeholder="Nova ação"><input id="pA" type="number" inputmode="numeric" placeholder="Peso"><select id="aA">'+AREAS.map(function(a,i){return '<option value="'+i+'">'+a+'</option>'}).join("")+'</select><button class="btn" data-addA>Adicionar ação</button></div>';
+  h+='<div class="add"><input id="nA" placeholder="Nova ação"><input id="pA" type="number" inputmode="numeric" placeholder="Peso"><select id="aA">'+AREAS.map(function(a,i){return '<option value="'+i+'">'+esc(a)+'</option>'}).join("")+'</select><button class="btn" data-addA>Adicionar ação</button></div>';
   h+='<h3>Escorregões e perdas</h3>';
   S.slips.forEach(function(x){h+='<div class="card"><div class="t">'+esc(x.n)+'<select class="sel" data-sarea="'+x.id+'">'+areaOpts(x.a)+'</select></div><input class="n" type="number" inputmode="numeric" data-spts="'+x.id+'" value="'+x.p+'"><button class="btn g" data-dels="'+x.id+'">✕</button></div>'});
-  h+='<div class="add"><input id="nS" placeholder="Novo escorregão"><input id="pS" type="number" inputmode="numeric" placeholder="Perda"><select id="aS">'+AREAS.map(function(a,i){return '<option value="'+i+'">'+a+'</option>'}).join("")+'</select><button class="btn" data-adds>Adicionar escorregão</button></div>';
+  h+='<div class="add"><input id="nS" placeholder="Novo escorregão"><input id="pS" type="number" inputmode="numeric" placeholder="Perda"><select id="aS">'+AREAS.map(function(a,i){return '<option value="'+i+'">'+esc(a)+'</option>'}).join("")+'</select><button class="btn" data-adds>Adicionar escorregão</button></div>';
   h+='<div class="card"><div class="t">Limite de perda por dia<small>Máximo de tokens que os escorregões tiram em um dia</small></div><input class="n" type="number" inputmode="numeric" data-cap value="'+S.cap+'"></div>';
   h+='<h3>Recompensas e preços</h3>';
   h+=rewReg();
   h+='<h3>Backup dos dados</h3><div class="help">Seus dados ficam salvos neste aparelho, automaticamente. Exporte um backup de vez em quando e guarde o arquivo (Drive, WhatsApp, e-mail). Se trocar de celular, importe o arquivo. '+(S.lastBackup?'Último backup: '+new Date(S.lastBackup).toLocaleDateString('pt-BR')+'.':'Você ainda não exportou nenhum backup.')+'</div><div class="add"><button class="btn" data-exp>Exportar backup</button><button class="btn g" data-imp style="grid-column:1/-1;padding:10px">Importar backup</button>'+(hasPrev()?'<button class="btn g" data-restprev style="grid-column:1/-1;padding:10px">Desfazer última importação</button>':'')+'<input id="imp" type="file" accept="application/json,.json" style="display:none"></div>';
   h+='<button class="btn g" data-hardrefresh style="margin:0 0 10px">Atualizar o app agora</button>';
-  h+='<div class="help">Versão 2.5 · Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
+  h+='<div class="help">Versão 2.6 · Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
   if(hasBackup())h+='<div class="add"><button class="btn g" data-recov style="grid-column:1/-1;padding:10px">Recuperar dados da versão anterior</button></div>';
   return h;
 }
-function render(){mkRO();
+function render(){mkRO();applyTheme();
   var m=document.getElementById("main"),y=window.scrollY;
   m.className="";void m.offsetWidth;if(tabChanged)m.className="fade";tabChanged=false;m.innerHTML=({resumo:vResumo,hoje:vHoje,rec:vRec,his:vHis,reg:vReg})[tab]();
+  if(storageBlocked)m.innerHTML='<div class="help" role="alert"><b>Os dados locais precisam de recuperação.</b> A gravação está bloqueada para preservar o conteúdo original. Exporte o arquivo original abaixo antes de restaurar um backup válido em Regras.</div><button class="btn" data-rawbackup>Baixar dados originais</button>'+m.innerHTML;
   head();nav();window.scrollTo(0,y);
 }
 function jokerUsed(){return S.log.some(function(l){return l.k==="j"&&!rvd(l)&&l.t>Date.now()-7*864e5})}
@@ -312,12 +329,12 @@ function hasPrev(){try{return !!localStorage.getItem("tokens_v1_prev")}catch(e){
 function restprev(){var p;try{p=JSON.parse(localStorage.getItem("tokens_v1_prev"))}catch(e){p=null}
   if(!p||validate(p)){alert("A cópia anterior não está disponível ou está inválida.");return}
   if(!confirm("Voltar aos dados de antes da última importação ("+p.log.length+" movimentações)? Os dados atuais ficam guardados para você poder voltar."))return;
-  var cur=JSON.stringify(S);S=p;fixS();try{localStorage.setItem("tokens_v1_prev",cur)}catch(e){}save();render();toast("Dados anteriores restaurados")}
-function hardRefresh(){toast("Atualizando…");var p=[];
+  var cur=JSON.stringify(S);S=p;fixS();try{localStorage.setItem("tokens_v1_prev",cur)}catch(e){}if(save()){render();toast("Dados anteriores restaurados")}else render()}
+function obsoleteHardRefresh(){toast("Atualizando…");var p=[];
   if(navigator.serviceWorker)p.push(navigator.serviceWorker.getRegistrations().then(function(r){return Promise.all(r.map(function(x){return x.unregister()}))}));
   if(window.caches)p.push(caches.keys().then(function(k){return Promise.all(k.map(function(x){return caches.delete(x)}))}));
   Promise.all(p).catch(function(){}).then(function(){location.reload()})}
-function recover(){try{var b=localStorage.getItem("tokens_v1_backup_v1");if(!b)return;if(!confirm("Substituir os dados atuais pela cópia salva antes da atualização?"))return;S=JSON.parse(b);fixS();save();render();toast("Dados recuperados")}catch(e){toast("Não foi possível recuperar")}}
+function recover(){try{var b=localStorage.getItem("tokens_v1_backup_v1");if(!b)return;if(!confirm("Substituir os dados atuais pela cópia salva antes da atualização?"))return;S=JSON.parse(b);fixS();if(save()){render();toast("Dados recuperados")}else render()}catch(e){toast("Não foi possível recuperar")}}
 function rev(e){S.log.push({u:uid(),t:Date.now(),rd:e.rd||dstr(Date.now()),k:"v",l:(e.k==="r"?"Estorno: ":"Reversão: ")+e.l,d:-e.d,id:e.id||"",ref:e.ref||"",orig:e.u});e.rv=true;RO[e.u]=1}
 function undoLog(u){var e=S.log.filter(function(l){return l.u===u})[0];if(!e||rvd(e)||e.k==="v")return false;
   if(e.d>0&&balance()-e.d<0){toast("Saldo ficaria negativo: não dá para desfazer");return false}
@@ -326,15 +343,15 @@ function undoLog(u){var e=S.log.filter(function(l){return l.u===u})[0];if(!e||rv
   rev(e);return true}
 function push(k,l,d,id){S.log.push({u:uid(),t:Date.now(),rd:dstr(Date.now()),k:k,l:l,d:d,id:id||""})}
 document.addEventListener("click",function(e){
-  var t=e.target.closest("button");if(!t)return;var d=t.dataset;
-  if((d.earn||d.redeem||d.slip||d.joker!==undefined||d.undo)&&busy())return;
+  var t=e.target.closest("button");if(!t)return;var d=t.dataset,beforeTasks=S.actions.map(snapshotTask);
+  if((d.earn||d.redeem||d.slip||d.joker!==undefined||d.undo||d.undolast)&&busy())return;
   if(d.tab){tab=d.tab;tabChanged=true;window.scrollTo(0,0)}
   else if(d.area!==undefined){area=+d.area}
   else if(d.earn){var a=S.actions.filter(function(x){return x.id===d.earn})[0],td=dstr(Date.now());
-    if(!a)return;if(a.on===false){toast("Ação inativa: ative em Regras");return}
+    if(!a)return;a=taskAt(a,sel);if(!sched(a,sel)){toast("Ação não prevista ou meta semanal atingida");return}if(a.on===false){toast("Ação inativa: ative em Regras");return}
     if(sel>td){toast("Não dá para registrar um dia futuro");return}
     if(a.once&&countOn(sel,a.id)>0){toast("Já registrado neste dia");return}
-    push("e",a.n,a.p,a.id);S.log[S.log.length-1].rd=sel;if(navigator.vibrate)navigator.vibrate(12);
+    push("e",a.n,a.p,a.id);S.log[S.log.length-1].rd=sel;S.log[S.log.length-1].area=AREAS[a.a];if(navigator.vibrate)navigator.vibrate(12);
     toast("+"+fmt(a.p)+(sel!==td?" · em "+fmtD(sel):"")+" · salvo")}
   else if(d.shift){sel=addD(sel,+d.shift);cm=sel.slice(0,7)}
   else if(d.cal!==undefined){calOpen=!calOpen}
@@ -347,7 +364,7 @@ document.addEventListener("click",function(e){
   else if(d.once){S.actions.forEach(function(a){if(a.id===d.once)a.once=!a.once})}
   else if(d.dow){var pr=d.dow.split(":"),ix=+pr[1];S.actions.forEach(function(a){if(a.id!==pr[0])return;var ds=(a.days&&a.days.length)?a.days.slice():[0,1,2,3,4,5,6],k=ds.indexOf(ix);if(k>-1)ds.splice(k,1);else ds.push(ix);
     if(!ds.length){toast("Escolha ao menos um dia");return}a.days=ds.length===7?undefined:ds.sort()})}
-  else if(d.redeem){var r=S.rewards.filter(function(x){return x.id===d.redeem})[0];if(!r||!r.c)return;var b0=balance();if(b0<r.c){toast("Saldo insuficiente: faltam "+fmt(r.c-b0)+" tokens");return}if(!confirm("Resgatar \""+r.n+"\" por "+fmt(r.c)+" tokens?\n\nSaldo atual: "+fmt(b0)+"\nSaldo depois: "+fmt(b0-r.c)))return;if(balance()<r.c)return;push("r","Resgate: "+r.n,-r.c,r.id);S.log[S.log.length-1].cat=r.cat||"";toast("Resgatado: "+r.n)}
+  else if(d.redeem){var r=S.rewards.filter(function(x){return x.id===d.redeem})[0];if(!r||!Number.isFinite(r.c)||r.c<=0||r.on===false||r.arch)return;var b0=balance();if(b0<r.c){toast("Saldo insuficiente: faltam "+fmt(r.c-b0)+" tokens");return}if(!confirm("Resgatar \""+r.n+"\" por "+fmt(r.c)+" tokens?\n\nSaldo atual: "+fmt(b0)+"\nSaldo depois: "+fmt(b0-r.c)))return;if(balance()<r.c)return;push("r","Resgate: "+r.n,-r.c,r.id);S.log[S.log.length-1].cat=r.cat||"";toast("Resgatado: "+r.n)}
   else if(d.undo){if(undoLog(d.undo))toast("Desfeito")}
   else if(d.addarea!==undefined){var nn=document.getElementById("nAr").value.trim();if(!nn)return;S.areas.push(nn)}
   else if(d.delarea!==undefined){var di=+d.delarea;
@@ -358,7 +375,7 @@ document.addEventListener("click",function(e){
   else if(d.joker!==undefined){joker()}
   else if(d.dels){S.slips=S.slips.filter(function(x){return x.id!==d.dels})}
   else if(d.adds!==undefined){var n3=document.getElementById("nS").value.trim(),p3=+document.getElementById("pS").value;if(!n3||!(p3>0))return;S.slips.push({id:uid(),n:n3,a:+document.getElementById("aS").value,p:p3})}
-  else if(d.dela){S.actions=S.actions.filter(function(x){return x.id!==d.dela})}
+  else if(d.dela){S.actions.forEach(function(a){if(a.id===d.dela){var b=snapshotTask(a);a.on=false;rememberTask(a,b)}})}
   else if(d.rfilter!==undefined){rcat=d.rfilter}
   else if(d.arch){S.rewards.forEach(function(r){if(r.id===d.arch)r.arch=true})}
   else if(d.unarch){S.rewards.forEach(function(r){if(r.id===d.unarch)delete r.arch})}
@@ -367,14 +384,16 @@ document.addEventListener("click",function(e){
   else if(d.delcat!==undefined){var ci=+d.delcat,cn=S.cats[ci];if(S.rewards.some(function(r){return r.cat===cn})){toast("Mude as recompensas dessa categoria antes de apagar");return}S.cats.splice(ci,1)}
   else if(d.used){S.log.forEach(function(l){if(l.u===d.used){if(l.used)delete l.used;else l.used=dstr(Date.now())}})}
   else if(d.delr){S.rewards=S.rewards.filter(function(x){return x.id!==d.delr})}
-  else if(d.adda!==undefined){var n=document.getElementById("nA").value.trim(),p=+document.getElementById("pA").value;if(!n||!(p>0))return;S.actions.push({id:uid(),n:n,a:+document.getElementById("aA").value,p:p})}
+  else if(d.adda!==undefined){var n=document.getElementById("nA").value.trim(),p=+document.getElementById("pA").value;if(!n||!(p>0))return;S.actions.push({id:uid(),once:true,n:n,a:+document.getElementById("aA").value,p:p})}
   else if(d.addr!==undefined){var n2=document.getElementById("nR").value.trim(),c=+document.getElementById("pR").value;if(!n2||!(c>0))return;S.rewards.push({id:uid(),n:n2,c:c,cat:document.getElementById("cR").value,desc:document.getElementById("dR").value.trim()})}
   else return;
+  S.actions.forEach(function(a,ix){if(beforeTasks[ix]&&JSON.stringify(snapshotTask(a))!==JSON.stringify(beforeTasks[ix]))rememberTask(a,beforeTasks[ix])});
   save();render();
 });
 document.addEventListener("change",function(e){
-  var i=e.target,d=i.dataset,v=Math.max(0,+i.value||0);
-  if(d.goal!==undefined)S.goal=v||1;
+  var i=e.target,d=i.dataset,v=Math.max(0,+i.value||0),beforeTasks=S.actions.map(snapshotTask);
+  if(d.taskname){var taskName=i.value.trim();if(taskName)S.actions.forEach(function(a){if(a.id===d.taskname)a.n=taskName})}
+  else if(d.goal!==undefined)S.goal=v||1;
   else if(d.pts)S.actions.forEach(function(a){if(a.id===d.pts)a.p=v});
   else if(d.cost)S.rewards.forEach(function(r){if(r.id===d.cost)r.c=v});
   else if(d.rn){var nm2=i.value.trim();if(nm2)S.rewards.forEach(function(r){if(r.id===d.rn)r.n=nm2})}
@@ -388,6 +407,7 @@ document.addEventListener("change",function(e){
   else if(d.aarea){S.actions.forEach(function(a){if(a.id===d.aarea)a.a=+i.value})}
   else if(d.sarea){S.slips.forEach(function(x){if(x.id===d.sarea)x.a=+i.value})}
   else return;
+  S.actions.forEach(function(a,ix){if(JSON.stringify(snapshotTask(a))!==JSON.stringify(beforeTasks[ix]))rememberTask(a,beforeTasks[ix])});
   save();render();
 });
 document.addEventListener("click",function(e){
@@ -405,14 +425,77 @@ document.addEventListener("change",function(e){
   var f=e.target.files[0];if(!f)return;var r=new FileReader();
   r.onload=function(){var d;try{d=JSON.parse(r.result)}catch(x){alert("Arquivo inválido: não é um backup do Mérito.");return}
     var er=validate(d);if(er){alert("Backup recusado: "+er+".\nSeus dados atuais não foram alterados.");return}
-    var bal=d.log.reduce(function(a,l){return a+l.d},0);
+    var bal=(d.bal0||0)+d.log.reduce(function(a,l){return a+l.d},0);
     if(!confirm("Backup com "+d.log.length+" movimentações, "+d.actions.length+" ações e "+d.rewards.length+" recompensas.\nSaldo: "+fmt(bal)+" tokens.\n\nIsto SUBSTITUI os dados atuais. Uma cópia dos atuais fica guardada. Continuar?"))return;
-    try{localStorage.setItem("tokens_v1_prev",JSON.stringify(S))}catch(x){alert("Não foi possível guardar a cópia de segurança. Importação cancelada.");return}
-    delete d.app;delete d.exportedAt;S=d;fixS();save();render();toast("Backup importado")};
+    try{localStorage.setItem("tokens_v1_prev",localStorage.getItem("tokens_v1")||JSON.stringify(S));storageBlocked=false}catch(x){alert("Não foi possível guardar a cópia de segurança. Importação cancelada.");return}
+    delete d.app;delete d.exportedAt;S=d;fixS();S.chk=balance();if(save()){render();toast("Backup importado")}else render()};
   r.readAsText(f);
 });
 document.addEventListener("toggle",function(e){var t=e.target;if(t&&t.dataset&&t.dataset.prog)OP[t.dataset.prog]=t.open},true);
 if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("controllerchange",function(){if(!window.__rl){window.__rl=1;location.reload()}});window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){})})}
+// Validation, wallet and reports integrated into the existing single-file app.
+function validate(d){
+  if(!d||typeof d!=="object"||Array.isArray(d))return "estrutura inválida";
+  if(d.v!==undefined&&(!Number.isInteger(d.v)||d.v<1||d.v>2))return "versão de dados incompatível";
+  if(d.app&&d.app!=="merito")return "arquivo de outro aplicativo";
+  if(!Array.isArray(d.actions)||!Array.isArray(d.rewards)||!Array.isArray(d.log))return "faltam ações, recompensas ou histórico";
+  function number(n){return typeof n==="number"&&Number.isFinite(n)}
+  function date(x){return typeof x==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&!isNaN(Date.parse(x+"T12:00:00"))&&dstr(Date.parse(x+"T12:00:00"))===x}
+  if(d.bal0!==undefined&&!number(d.bal0))return "saldo inicial inválido";
+  for(var key of ["areas","cats"]){if(d[key]!==undefined&&(!Array.isArray(d[key])||d[key].some(function(x){return typeof x!=="string"||!x.trim()})))return "categorias inválidas"}
+  for(var key of ["actions","rewards","slips"]){
+    if(d[key]===undefined&&key==="slips")continue;
+    if(!Array.isArray(d[key]))return "cadastro inválido";
+    var ids=new Set();for(var x of d[key]){
+      if(!x||typeof x.id!=="string"||!/^[-\w]+$/.test(x.id)||ids.has(x.id)||typeof x.n!=="string"||!x.n.trim())return "cadastro sem identificação ou duplicado";
+      ids.add(x.id);var value=key==="rewards"?x.c:x.p;if(!number(value)||value<0)return "valor de cadastro inválido";
+      if(key!=="rewards"&&(!Number.isInteger(x.a)||x.a<0||(d.areas&&x.a>=d.areas.length)))return "área de ação inválida";
+      if(x.days&&(!Array.isArray(x.days)||x.days.some(function(n){return !Number.isInteger(n)||n<0||n>6})))return "recorrência inválida";
+      if(x.wk!==undefined&&(!Number.isInteger(x.wk)||x.wk<0||x.wk>7))return "meta semanal inválida";
+      if(x.versions&&(!Array.isArray(x.versions)||x.versions.some(function(v){return !v||!date(v.from)||!v.value||typeof v.value.n!=="string"||!number(v.value.p)||v.value.p<0||!Number.isInteger(v.value.a)||v.value.a<0||v.value.wk!==undefined&&(!Number.isInteger(v.value.wk)||v.value.wk<0||v.value.wk>7)||v.value.days&&(!Array.isArray(v.value.days)||v.value.days.some(function(n){return !Number.isInteger(n)||n<0||n>6}))})))return "histórico de programação inválido";
+    }
+  }
+  var ids=new Map(),sum=d.bal0||0,reversed=new Set();
+  for(var l of d.log){
+    if(!l||typeof l.u!=="string"||!/^[-\w]+$/.test(l.u)||ids.has(l.u)||!["e","r","s","j","v","a"].includes(l.k)||!number(l.d)||!number(l.t)||isNaN(new Date(l.t).getTime())||typeof l.l!=="string"||l.rd!==undefined&&!date(l.rd))return "movimentação inválida ou duplicada";
+    if((l.k==="e"||l.k==="j")&&l.d<0||(l.k==="r"||l.k==="s")&&l.d>0)return "sinal de movimentação inválido";
+    ids.set(l.u,l);sum+=l.d;
+  }
+  for(var l of d.log){if(l.k==="v"){var original=ids.get(l.orig);if(!original||original.k==="v"||l.d!==-original.d||reversed.has(l.orig))return "reversão inválida ou duplicada";reversed.add(l.orig)}}
+  if(!Number.isFinite(sum)||sum<0)return "saldo final inválido";
+  if(d.chk!==undefined&&(!number(d.chk)||Math.abs(d.chk-sum)>0.000001))return "saldo não confere com o histórico";
+  return "";
+}
+var historyType="",historyFrom="",historyTo="",historyLimit=80,reportMode="week";
+function vHis(){
+  var h='<div class="help">Carteira · saldo '+fmt(balance())+' tokens. As correções preservam o lançamento original.</div><div class="filters"><label>De<input type="date" data-wallet="from" value="'+historyFrom+'"></label><label>Até<input type="date" data-wallet="to" value="'+historyTo+'"></label><label>Tipo<select data-wallet="type">'+[["","Todos"],["e","Tarefas"],["r","Resgates"],["v","Reversões"],["a","Ajustes"],["s","Escorregões"],["j","Coringa"]].map(function(x){return '<option value="'+x[0]+'"'+(historyType===x[0]?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select></label></div>';
+  var rows=S.log.filter(function(l){var day=dstr(l.t);return (!historyFrom||day>=historyFrom)&&(!historyTo||day<=historyTo)&&(!historyType||historyType===l.k)}),earned=0,spent=0;
+  rows.forEach(function(l){if(!rvd(l)){if(l.k==="e")earned+=l.d;if(l.k==="r")spent-=l.d}});
+  h+='<p class="dsum">Tarefas válidas: +'+fmt(earned)+' · Resgates válidos: −'+fmt(spent)+' · '+rows.length+' lançamentos (período de registro)</p>';
+  rows.slice().reverse().slice(0,historyLimit).forEach(function(l){var revoked=rvd(l);h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(l.l)+'<small>Registrado: '+new Date(l.t).toLocaleString('pt-BR')+(l.k==="e"?' · Realizado: '+esc(rdOf(l))+(rdOf(l)!==dstr(l.t)?' · retroativo':''):'')+(revoked?' · revertido':'')+(l.used?' · usada em '+esc(l.used):'')+'</small><details><summary>Identificação</summary><small>'+esc(l.u)+(l.id?' · cadastro '+esc(l.id):'')+(l.orig?' · original '+esc(l.orig):'')+'</small></details></div><span class="'+(l.d>=0?'pos':'neg')+'">'+(l.d>0?'+':'')+fmt(l.d)+'</span>'+(revoked||l.k==='v'?'':'<button class="btn g" data-undo="'+esc(l.u)+'">Desfazer</button>')+(l.k==='r'&&!revoked?'<button class="btn g" data-used="'+esc(l.u)+'">'+(l.used?'Usada ✓':'Marcar usada')+'</button>':'')+'</div>'});
+  if(!rows.length)h+='<p class="empty">Sem movimentações neste filtro.</p>';
+  if(rows.length>historyLimit)h+='<button class="btn g" data-morehistory>Mostrar mais</button>';
+  return h;
+}
+function periodStats(from,to){var completed=S.log.filter(function(l){return l.k==='e'&&!rvd(l)&&rdOf(l)>=from&&rdOf(l)<=to}),spent=S.log.filter(function(l){return l.k==='r'&&!rvd(l)&&dstr(l.t)>=from&&dstr(l.t)<=to}).reduce(function(n,l){return n-l.d},0);return {count:completed.length,earned:completed.reduce(function(n,l){return n+l.d},0),spent:spent,rows:completed}}
+function reports(){var today=dstr(Date.now()),from,previousFrom,previousTo;if(reportMode==='month'){from=today.slice(0,7)+'-01';previousTo=addD(from,-1);previousFrom=previousTo.slice(0,7)+'-01'}else{from=weekStart(today);previousTo=addD(from,-1);previousFrom=addD(from,-7)}var current=periodStats(from,today),prev=periodStats(previousFrom,addD(previousFrom,Math.round((new Date(today+'T12:00:00')-new Date(from+'T12:00:00'))/86400000)));if(reportMode==='month'){var end=previousTo;var requested=previousFrom.slice(0,8)+today.slice(8);prev=periodStats(previousFrom,requested>end?end:requested)}
+  var h='<h3>Acompanhamento</h3><div class="chips"><button class="chip'+(reportMode==='week'?' on':'')+'" data-report="week">Semana</button><button class="chip'+(reportMode==='month'?' on':'')+'" data-report="month">Mês</button></div><p class="dsum">'+from+' a '+today+' · atividades pela realização; gastos pelo lançamento</p><div class="grid"><div class="stat"><small>Tokens ganhos</small><b>+'+fmt(current.earned)+'</b></div><div class="stat"><small>Tokens gastos</small><b>'+fmt(current.spent)+'</b></div><div class="stat"><small>Conclusões válidas</small><b>'+current.count+'</b></div></div><p class="help">'+(prev.count?'Comparado ao mesmo trecho do período anterior: '+(current.count-prev.count>=0?'+':'')+(current.count-prev.count)+' atividades.':'Período anterior sem registros suficientes para comparação.')+'</p>';
+  var groups=Object.create(null),days=Object.create(null);current.rows.forEach(function(l){var group=l.area||'Área não registrada no histórico antigo';groups[group]=(groups[group]||0)+l.d;days[rdOf(l)]=(days[rdOf(l)]||0)+1});Object.keys(groups).forEach(function(k){h+='<p>'+esc(k)+': '+fmt(groups[k])+' tokens</p>'});var best=Object.keys(days).sort(function(a,b){return days[b]-days[a]})[0];if(best)h+='<p class="dsum">Mais atividades: '+best+' · '+days[best]+' registros</p>';h+='<details><summary>Frequência por tarefa no período</summary>';S.actions.forEach(function(a){var records=current.rows.filter(function(l){return l.id===a.id}),unique=new Set(records.map(rdOf));h+='<p>'+esc(a.n)+': '+records.length+' conclusões em '+unique.size+' dias</p>'});return h+'</details>';
+}
+var originalResumo=vResumo;
+vResumo=function(){var today=dstr(Date.now()),tasks=S.actions.filter(function(a){return sched(a,today)}),done=tasks.filter(function(a){return countOn(today,a.id)>0}).length,potential=tasks.reduce(function(n,a){return n+(countOn(today,a.id)?0:taskAt(a,today).p)},0);return '<div class="help">Hoje: '+done+' de '+tasks.length+' tarefas previstas · '+fmt(potential)+' tokens nas tarefas ainda não registradas.</div>'+originalResumo()+reports()};
+var originalReg=vReg;
+vReg=function(){return originalReg()+'<h3>Preferências</h3><label>Tema <select data-visual><option value="auto">Automático</option><option value="light"'+(S.theme==='light'?' selected':'')+'>Claro</option><option value="dark"'+(S.theme==='dark'?' selected':'')+'>Escuro</option></select></label><h3>Correção de saldo</h3><div class="help">O ajuste ficará no histórico. Para corrigir uma tarefa ou resgate, prefira Desfazer.</div><div class="add"><input id="adjustValue" type="number" placeholder="Valor (+ ou −)" aria-label="Tokens do ajuste"><input id="adjustReason" placeholder="Motivo obrigatório" aria-label="Motivo do ajuste"><button class="btn g" data-adjust>Registrar ajuste</button></div>'};
+document.addEventListener('click',function(e){var t=e.target.closest('button');if(!t)return;var d=t.dataset;if(d.morehistory!==undefined){historyLimit+=80;render()}else if(d.report){reportMode=d.report;render()}else if(d.adjust!==undefined){var value=Number(document.getElementById('adjustValue').value),reason=document.getElementById('adjustReason').value.trim();if(!Number.isFinite(value)||!value||!reason){toast('Informe um valor e o motivo');return}if(balance()+value<0){toast('O ajuste deixaria o saldo negativo');return}if(!confirm('Registrar ajuste de '+fmt(value)+' tokens?\nMotivo: '+reason))return;push('a','Ajuste: '+reason,value);if(save())toast('Ajuste registrado');render()}});
+document.addEventListener('change',function(e){var d=e.target.dataset;if(d.wallet){if(d.wallet==='from')historyFrom=e.target.value;if(d.wallet==='to')historyTo=e.target.value;if(d.wallet==='type')historyType=e.target.value;historyLimit=80;render()}if(d.visual!==undefined){S.theme=e.target.value;save();applyTheme()}});
+function applyTheme(){if(S.theme&&S.theme!=='auto')document.documentElement.dataset.theme=S.theme;else delete document.documentElement.dataset.theme}
+applyTheme();
+document.addEventListener('click',function(e){var t=e.target.closest('[data-rawbackup]');if(!t)return;try{var content=localStorage.getItem('tokens_v1')||'',blob=new Blob([content],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='merito-dados-originais-recuperacao.json';a.click()}catch(x){toast('Armazenamento indisponível neste navegador')}});
+
+function hardRefresh(){if(!navigator.serviceWorker)return; navigator.serviceWorker.getRegistration().then(function(r){return r?r.update():null}).then(function(){toast("Verificação concluída. Reabra o app para atualizar.")}).catch(function(){toast("Sem conexão: a versão offline foi preservada")})}
+
+try{window.persisted=localStorage.getItem("tokens_v1")}catch(e){storageBlocked=true}
+window.addEventListener("storage",function(e){if(e.key==="tokens_v1"){try{var next=JSON.parse(e.newValue);if(validate(next))throw 0;S=next;fixS();durable=JSON.stringify(S);window.persisted=e.newValue;render();toast("Dados atualizados de outra aba")}catch(x){storageBlocked=true;toast("Dados externos inválidos: gravação bloqueada")}}});
 render();
 </script>
 </body>
