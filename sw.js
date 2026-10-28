@@ -1,4 +1,4 @@
-const CACHE='merito-2-6-1';
+const CACHE='merito-2-6-2';
 const FILES=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-maskable-512.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE&&(key.startsWith('tokens-v')||key.startsWith('merito-'))).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));

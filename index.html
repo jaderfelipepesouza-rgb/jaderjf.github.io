@@ -229,7 +229,7 @@ function vResumo(){
   var am=Math.max(1,Math.max.apply(null,ar));
   h+='<h3>Ganhos do mês por área</h3><div class="card" style="display:block">'+AREAS.map(function(a,i){return '<div class="ar" style="--c:'+ac(i)+'"><span>'+esc(a)+'</span><div class="bar"><i style="width:'+ar[i]/am*100+'%"></i></div><span>'+fmt(ar[i])+'</span></div>'}).join("")+'</div>';
   h+='<h3>Movimentação de hoje</h3>';
-  var td=S.log.filter(function(l){return dkey(l.t)===k}).reverse();
+  var td=S.log.filter(function(l){return (l.k==="e"?rdOf(l)===dstr(now):dkey(l.t)===k)}).reverse();
   if(!td.length)h+='<div class="empty">Nada hoje ainda. Vá em ✓ Hoje e comece.</div>';
   td.forEach(function(l){h+='<div class="card"><div class="t">'+esc(l.l)+'</div><span class="'+(l.d>0?"pos":"neg")+'">'+(l.d>0?"+":"")+fmt(l.d)+'</span></div>'});
   h+='<div class="empty">Resgates feitos no total: '+res+'</div>';
@@ -467,12 +467,19 @@ function validate(d){
   return "";
 }
 var historyType="",historyFrom="",historyTo="",historyLimit=80,reportMode="week";
+function historyDay(l){return l.k==="e"?rdOf(l):dstr(l.t)}
 function vHis(){
-  var h='<div class="help">Carteira · saldo '+fmt(balance())+' tokens. As correções preservam o lançamento original.</div><div class="filters"><label>De<input type="date" data-wallet="from" value="'+historyFrom+'"></label><label>Até<input type="date" data-wallet="to" value="'+historyTo+'"></label><label>Tipo<select data-wallet="type">'+[["","Todos"],["e","Tarefas"],["r","Resgates"],["v","Reversões"],["a","Ajustes"],["s","Escorregões"],["j","Coringa"]].map(function(x){return '<option value="'+x[0]+'"'+(historyType===x[0]?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select></label></div>';
-  var rows=S.log.filter(function(l){var day=dstr(l.t);return (!historyFrom||day>=historyFrom)&&(!historyTo||day<=historyTo)&&(!historyType||historyType===l.k)}),earned=0,spent=0;
+  var h='<div class="help">Carteira · saldo '+fmt(balance())+' tokens. Tarefas aparecem na data de realização; os demais movimentos, na data da operação. As correções preservam o lançamento original.</div><div class="filters"><label>De<input type="date" data-wallet="from" value="'+historyFrom+'"></label><label>Até<input type="date" data-wallet="to" value="'+historyTo+'"></label><label>Tipo<select data-wallet="type">'+[["","Todos"],["e","Tarefas"],["r","Resgates"],["v","Reversões"],["a","Ajustes"],["s","Escorregões"],["j","Coringa"]].map(function(x){return '<option value="'+x[0]+'"'+(historyType===x[0]?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select></label></div>';
+  var rows=S.log.filter(function(l){var day=historyDay(l);return (!historyFrom||day>=historyFrom)&&(!historyTo||day<=historyTo)&&(!historyType||historyType===l.k)}),earned=0,spent=0;
   rows.forEach(function(l){if(!rvd(l)){if(l.k==="e")earned+=l.d;if(l.k==="r")spent-=l.d}});
-  h+='<p class="dsum">Tarefas válidas: +'+fmt(earned)+' · Resgates válidos: −'+fmt(spent)+' · '+rows.length+' lançamentos (período de registro)</p>';
-  rows.slice().reverse().slice(0,historyLimit).forEach(function(l){var revoked=rvd(l);h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(l.l)+'<small>Registrado: '+new Date(l.t).toLocaleString('pt-BR')+(l.k==="e"?' · Realizado: '+esc(rdOf(l))+(rdOf(l)!==dstr(l.t)?' · retroativo':''):'')+(revoked?' · revertido':'')+(l.used?' · usada em '+esc(l.used):'')+'</small><details><summary>Identificação</summary><small>'+esc(l.u)+(l.id?' · cadastro '+esc(l.id):'')+(l.orig?' · original '+esc(l.orig):'')+'</small></details></div><span class="'+(l.d>=0?'pos':'neg')+'">'+(l.d>0?'+':'')+fmt(l.d)+'</span>'+(revoked||l.k==='v'?'':'<button class="btn g" data-undo="'+esc(l.u)+'">Desfazer</button>')+(l.k==='r'&&!revoked?'<button class="btn g" data-used="'+esc(l.u)+'">'+(l.used?'Usada ✓':'Marcar usada')+'</button>':'')+'</div>'});
+  h+='<p class="dsum">Tarefas válidas: +'+fmt(earned)+' · Resgates válidos: −'+fmt(spent)+' · '+rows.length+' lançamentos (período de referência)</p>';
+  rows.sort(function(a,b){var da=historyDay(a),db=historyDay(b);return da===db?b.t-a.t:da<db?1:-1}).slice(0,historyLimit).forEach(function(l){
+    var revoked=rvd(l),day=historyDay(l),retro=l.k==='e'&&day!==dstr(l.t);
+    var primary=new Date(day+'T12:00:00').toLocaleDateString('pt-BR');
+    var when=new Date(l.t).toLocaleString('pt-BR');
+    var info=(l.k==='e'?'Realizado: ':'Data: ')+primary+(retro?' · registrado posteriormente':'')+(revoked?' · revertido':'')+(l.used?' · usada em '+esc(l.used):'');
+    h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(l.l)+'<small>'+info+'</small><details><summary>Detalhes do lançamento</summary><small>Registrado: '+esc(when)+' · Identificação: '+esc(l.u)+(l.id?' · cadastro '+esc(l.id):'')+(l.orig?' · original '+esc(l.orig):'')+'</small></details></div><span class="'+(l.d>=0?'pos':'neg')+'">'+(l.d>0?'+':'')+fmt(l.d)+'</span>'+(revoked||l.k==='v'?'':'<button class="btn g" data-undo="'+esc(l.u)+'">Desfazer</button>')+(l.k==='r'&&!revoked?'<button class="btn g" data-used="'+esc(l.u)+'">'+(l.used?'Usada ✓':'Marcar usada')+'</button>':'')+'</div>';
+  });
   if(!rows.length)h+='<p class="empty">Sem movimentações neste filtro.</p>';
   if(rows.length>historyLimit)h+='<button class="btn g" data-morehistory>Mostrar mais</button>';
   return h;
