@@ -112,6 +112,13 @@ main.fade{animation:f .22s ease}
 .rd{width:100%;resize:vertical;margin:6px 0}
 .prog select{max-width:190px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.filters label{flex:1;min-width:120px;font-size:12px}.filters input,.filters select{display:block;width:100%}.card{flex-wrap:wrap}.card .t{overflow-wrap:anywhere;min-width:120px}textarea{font:inherit;color:var(--tx);background:var(--soft);border:1px solid var(--bd);border-radius:10px;padding:10px}summary,button{cursor:pointer}button{min-height:44px}.ib{width:32px;height:32px;min-height:32px}#toast{white-space:normal;text-align:center;max-width:calc(100vw - 24px);width:max-content}.dw.on{color:var(--ink)}
+
+/* Mérito 2.7 — resgates com data de referência e pendências */
+.merit-overlay{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:18px}
+.merit-dialog{background:var(--card);color:var(--tx);border:1px solid var(--bd);border-radius:18px;padding:20px;width:min(100%,440px);max-height:90dvh;overflow:auto;box-shadow:0 15px 50px rgba(0,0,0,.35)}
+.merit-dialog label{display:block;margin:12px 0 5px;font-size:13px;color:var(--mu)}
+.merit-dialog input{width:100%;min-height:44px}.merit-actions{display:flex;gap:8px;margin-top:16px}.merit-actions button{flex:1;min-width:0}
+.merit-pending{margin-top:22px}.merit-pending .card{align-items:flex-start}
 </style>
 </head>
 <body>
@@ -212,8 +219,8 @@ function nav(){
 var tt;function toast(m){var e=document.getElementById("toast");e.textContent=m;e.className="on";clearTimeout(tt);tt=setTimeout(function(){e.className=""},1600)}
 function vResumo(){
   var b=balance(),now=Date.now(),DAY=864e5,k=dkey(now),tg=0,tr=0;
-  S.log.forEach(function(l){if((l.k==="e"?rdOf(l)===dstr(now):dkey(l.t)===k)&&!rvd(l)&&l.k!=="v"){if(l.d>0)tg+=l.d;else tr-=l.d}});
-  var w=S.log.filter(function(l){return l.t>now-7*DAY}).reduce(function(s,l){return s+l.d},0);
+  S.log.forEach(function(l){if(((l.k==="e"||l.k==="r")?rdOf(l)===dstr(now):dkey(l.t)===k)&&!rvd(l)&&l.k!=="v"){if(l.d>0)tg+=l.d;else tr-=l.d}});
+  var w=S.log.filter(function(l){return historyDay(l)>=addD(dstr(now),-6)}).reduce(function(s,l){return s+l.d},0);
   var disp=actRw().filter(function(r){return r.c<=b}).length;
   var res=S.log.filter(function(l){return l.k==="r"&&!rvd(l)}).length;
   var sl7=S.log.filter(function(l){return l.k==="s"&&!rvd(l)&&l.t>now-7*DAY}).length,lost7=-S.log.filter(function(l){return(l.k==="s"||l.k==="j")&&!rvd(l)&&l.t>now-7*DAY}).reduce(function(s,l){return s+l.d},0);
@@ -262,7 +269,12 @@ function vRec(){var b=balance(),L=actRw();
   else h+='<div class="empty">Sem recompensas. Crie em Regras.</div>';
   L.filter(function(r){return rcat===""||(rcat==="__none"?(!r.cat||S.cats.indexOf(r.cat)<0):r.cat===rcat)}).sort(function(a,c){return a.c-c.c}).forEach(function(r){
     var ok=b>=r.c;
-    h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(r.n)+(r.desc?'<button class="ib" data-rx="'+r.id+'" aria-expanded="'+!!RX[r.id]+'" aria-label="Ver detalhes">i</button>':"")+'<small>'+fmt(r.c)+' tokens'+(ok?"":" · faltam "+fmt(r.c-b))+'</small></div><button class="btn'+(ok?"":" off")+'" data-redeem="'+r.id+'">'+(ok?"Resgatar":"Bloqueado")+'</button>'+(r.desc?'<div class="dsc'+(RX[r.id]?" open":"")+'"><div>'+esc(r.desc)+'</div></div>':"")+'</div>'});
+    h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(r.n)+(r.desc?'<button class="ib" data-rx="'+r.id+'" aria-expanded="'+!!RX[r.id]+'" aria-label="Ver detalhes">i</button>':"")+'<small>'+fmt(r.c)+' tokens'+(ok?"":" · faltam "+fmt(r.c-b))+'</small></div><button class="btn'+(ok?"":" g")+'" data-openredeem="'+r.id+'">'+"Resgatar"+'</button>'+(r.desc?'<div class="dsc'+(RX[r.id]?" open":"")+'"><div>'+esc(r.desc)+'</div></div>':"")+'</div>'});
+  var pending=S.log.filter(function(l){return l.k==='r'&&!rvd(l)&&!l.used}).sort(function(a,b){return historyDay(b).localeCompare(historyDay(a))||b.t-a.t});
+  h+='<section class="merit-pending"><h3>Recompensas pendentes ('+pending.length+')</h3>';
+  if(!pending.length)h+='<p class="empty">Nenhuma recompensa aguardando utilização.</p>';
+  pending.forEach(function(l){h+='<div class="card"><div class="t">'+esc(l.l.replace(/^Resgate: /,''))+'<small>Resgatada em '+fmtFullDate(historyDay(l))+' · '+fmt(-l.d)+' tokens</small></div><button class="btn g" data-openused="'+esc(l.u)+'">Marcar como utilizada</button></div>'});
+  h+='</section>';
   return h;
 }
 function rewReg(){var h='<div class="help">Organize as recompensas em categorias. Arquivar esconde a recompensa sem apagar o histórico dos resgates.</div><h3>Categorias</h3>';
@@ -299,7 +311,7 @@ function vReg(){
   h+=rewReg();
   h+='<h3>Backup dos dados</h3><div class="help">Seus dados ficam salvos neste aparelho, automaticamente. Exporte um backup de vez em quando e guarde o arquivo (Drive, WhatsApp, e-mail). Se trocar de celular, importe o arquivo. '+(S.lastBackup?'Último backup: '+new Date(S.lastBackup).toLocaleDateString('pt-BR')+'.':'Você ainda não exportou nenhum backup.')+'</div><div class="add"><button class="btn" data-exp>Exportar backup</button><button class="btn g" data-imp style="grid-column:1/-1;padding:10px">Importar backup</button>'+(hasPrev()?'<button class="btn g" data-restprev style="grid-column:1/-1;padding:10px">Desfazer última importação</button>':'')+'<input id="imp" type="file" accept="application/json,.json" style="display:none"></div>';
   h+='<button class="btn g" data-hardrefresh style="margin:0 0 10px">Atualizar o app agora</button>';
-  h+='<div class="help">Versão 2.6 · Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
+  h+='<div class="help">Versão 2.7 · Verificação do saldo: '+(verify()?"confere com o histórico":"divergência encontrada, exporte um backup agora")+' · '+S.log.length+' lançamentos · dados na versão '+S.v+'</div>';
   if(hasBackup())h+='<div class="add"><button class="btn g" data-recov style="grid-column:1/-1;padding:10px">Recuperar dados da versão anterior</button></div>';
   return h;
 }
@@ -307,7 +319,7 @@ function render(){mkRO();applyTheme();
   var m=document.getElementById("main"),y=window.scrollY;
   m.className="";void m.offsetWidth;if(tabChanged)m.className="fade";tabChanged=false;m.innerHTML=({resumo:vResumo,hoje:vHoje,rec:vRec,his:vHis,reg:vReg})[tab]();
   if(storageBlocked)m.innerHTML='<div class="help" role="alert"><b>Os dados locais precisam de recuperação.</b> A gravação está bloqueada para preservar o conteúdo original. Exporte o arquivo original abaixo antes de restaurar um backup válido em Regras.</div><button class="btn" data-rawbackup>Baixar dados originais</button>'+m.innerHTML;
-  head();nav();window.scrollTo(0,y);
+  head();nav();if(meritModal)m.insertAdjacentHTML('beforeend',meritModalHtml());window.scrollTo(0,y);
 }
 function jokerUsed(){return S.log.some(function(l){return l.k==="j"&&!rvd(l)&&l.t>Date.now()-7*864e5})}
 function lastSlip(){var a=S.log.filter(function(l){return l.k==="s"&&!l.j&&!rvd(l)&&l.t>Date.now()-7*864e5});return a[a.length-1]}
@@ -467,28 +479,59 @@ function validate(d){
   return "";
 }
 var historyType="",historyFrom="",historyTo="",historyLimit=80,reportMode="week";
-function historyDay(l){return l.k==="e"?rdOf(l):dstr(l.t)}
+function historyDay(l){return (l.k==='e'||l.k==='r')?rdOf(l):dstr(l.t)}
 function vHis(){
   var h='<div class="help">Carteira · saldo '+fmt(balance())+' tokens. Tarefas aparecem na data de realização; os demais movimentos, na data da operação. As correções preservam o lançamento original.</div><div class="filters"><label>De<input type="date" data-wallet="from" value="'+historyFrom+'"></label><label>Até<input type="date" data-wallet="to" value="'+historyTo+'"></label><label>Tipo<select data-wallet="type">'+[["","Todos"],["e","Tarefas"],["r","Resgates"],["v","Reversões"],["a","Ajustes"],["s","Escorregões"],["j","Coringa"]].map(function(x){return '<option value="'+x[0]+'"'+(historyType===x[0]?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select></label></div>';
   var rows=S.log.filter(function(l){var day=historyDay(l);return (!historyFrom||day>=historyFrom)&&(!historyTo||day<=historyTo)&&(!historyType||historyType===l.k)}),earned=0,spent=0;
   rows.forEach(function(l){if(!rvd(l)){if(l.k==="e")earned+=l.d;if(l.k==="r")spent-=l.d}});
   h+='<p class="dsum">Tarefas válidas: +'+fmt(earned)+' · Resgates válidos: −'+fmt(spent)+' · '+rows.length+' lançamentos (período de referência)</p>';
   rows.sort(function(a,b){var da=historyDay(a),db=historyDay(b);return da===db?b.t-a.t:da<db?1:-1}).slice(0,historyLimit).forEach(function(l){
-    var revoked=rvd(l),day=historyDay(l),retro=l.k==='e'&&day!==dstr(l.t);
+    var revoked=rvd(l),day=historyDay(l),retro=(l.k==='e'||l.k==='r')&&day!==dstr(l.t);
     var primary=new Date(day+'T12:00:00').toLocaleDateString('pt-BR');
     var when=new Date(l.t).toLocaleString('pt-BR');
-    var info=(l.k==='e'?'Realizado: ':'Data: ')+primary+(retro?' · registrado posteriormente':'')+(revoked?' · revertido':'')+(l.used?' · usada em '+esc(l.used):'');
-    h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(l.l)+'<small>'+info+'</small><details><summary>Detalhes do lançamento</summary><small>Registrado: '+esc(when)+' · Identificação: '+esc(l.u)+(l.id?' · cadastro '+esc(l.id):'')+(l.orig?' · original '+esc(l.orig):'')+'</small></details></div><span class="'+(l.d>=0?'pos':'neg')+'">'+(l.d>0?'+':'')+fmt(l.d)+'</span>'+(revoked||l.k==='v'?'':'<button class="btn g" data-undo="'+esc(l.u)+'">Desfazer</button>')+(l.k==='r'&&!revoked?'<button class="btn g" data-used="'+esc(l.u)+'">'+(l.used?'Usada ✓':'Marcar usada')+'</button>':'')+'</div>';
+    var info=(l.k==='e'?'Realizado: ':l.k==='r'?'Resgatado: ':'Data: ')+primary+(retro?' · registrado posteriormente':'')+(revoked?' · revertido':'')+(l.used?' · usada em '+esc(l.used):'');
+    h+='<div class="card" style="flex-wrap:wrap"><div class="t">'+esc(l.l)+'<small>'+info+'</small><details><summary>Detalhes do lançamento</summary><small>Registrado: '+esc(when)+' · Identificação: '+esc(l.u)+(l.id?' · cadastro '+esc(l.id):'')+(l.orig?' · original '+esc(l.orig):'')+'</small></details></div><span class="'+(l.d>=0?'pos':'neg')+'">'+(l.d>0?'+':'')+fmt(l.d)+'</span>'+(revoked||l.k==='v'?'':'<button class="btn g" data-undo="'+esc(l.u)+'">Desfazer</button>')+(l.k==='r'&&!revoked?'<button class="btn g" data-openused="'+esc(l.u)+'">'+(l.used?'Utilizada ✓':'Marcar como utilizada')+'</button>':'')+'</div>';
   });
   if(!rows.length)h+='<p class="empty">Sem movimentações neste filtro.</p>';
   if(rows.length>historyLimit)h+='<button class="btn g" data-morehistory>Mostrar mais</button>';
   return h;
 }
-function periodStats(from,to){var completed=S.log.filter(function(l){return l.k==='e'&&!rvd(l)&&rdOf(l)>=from&&rdOf(l)<=to}),spent=S.log.filter(function(l){return l.k==='r'&&!rvd(l)&&dstr(l.t)>=from&&dstr(l.t)<=to}).reduce(function(n,l){return n-l.d},0);return {count:completed.length,earned:completed.reduce(function(n,l){return n+l.d},0),spent:spent,rows:completed}}
+function periodStats(from,to){var completed=S.log.filter(function(l){return l.k==='e'&&!rvd(l)&&rdOf(l)>=from&&rdOf(l)<=to}),spent=S.log.filter(function(l){return l.k==='r'&&!rvd(l)&&historyDay(l)>=from&&historyDay(l)<=to}).reduce(function(n,l){return n-l.d},0);return {count:completed.length,earned:completed.reduce(function(n,l){return n+l.d},0),spent:spent,rows:completed}}
 function reports(){var today=dstr(Date.now()),from,previousFrom,previousTo;if(reportMode==='month'){from=today.slice(0,7)+'-01';previousTo=addD(from,-1);previousFrom=previousTo.slice(0,7)+'-01'}else{from=weekStart(today);previousTo=addD(from,-1);previousFrom=addD(from,-7)}var current=periodStats(from,today),prev=periodStats(previousFrom,addD(previousFrom,Math.round((new Date(today+'T12:00:00')-new Date(from+'T12:00:00'))/86400000)));if(reportMode==='month'){var end=previousTo;var requested=previousFrom.slice(0,8)+today.slice(8);prev=periodStats(previousFrom,requested>end?end:requested)}
   var h='<h3>Acompanhamento</h3><div class="chips"><button class="chip'+(reportMode==='week'?' on':'')+'" data-report="week">Semana</button><button class="chip'+(reportMode==='month'?' on':'')+'" data-report="month">Mês</button></div><p class="dsum">'+from+' a '+today+' · atividades pela realização; gastos pelo lançamento</p><div class="grid"><div class="stat"><small>Tokens ganhos</small><b>+'+fmt(current.earned)+'</b></div><div class="stat"><small>Tokens gastos</small><b>'+fmt(current.spent)+'</b></div><div class="stat"><small>Conclusões válidas</small><b>'+current.count+'</b></div></div><p class="help">'+(prev.count?'Comparado ao mesmo trecho do período anterior: '+(current.count-prev.count>=0?'+':'')+(current.count-prev.count)+' atividades.':'Período anterior sem registros suficientes para comparação.')+'</p>';
   var groups=Object.create(null),days=Object.create(null);current.rows.forEach(function(l){var group=l.area||'Área não registrada no histórico antigo';groups[group]=(groups[group]||0)+l.d;days[rdOf(l)]=(days[rdOf(l)]||0)+1});Object.keys(groups).forEach(function(k){h+='<p>'+esc(k)+': '+fmt(groups[k])+' tokens</p>'});var best=Object.keys(days).sort(function(a,b){return days[b]-days[a]})[0];if(best)h+='<p class="dsum">Mais atividades: '+best+' · '+days[best]+' registros</p>';h+='<details><summary>Frequência por tarefa no período</summary>';S.actions.forEach(function(a){var records=current.rows.filter(function(l){return l.id===a.id}),unique=new Set(records.map(rdOf));h+='<p>'+esc(a.n)+': '+records.length+' conclusões em '+unique.size+' dias</p>'});return h+'</details>';
 }
+// Saldo histórico: fechamento de cada dia; reversões pertencem à data do evento original.
+function fmtFullDate(day){return new Date(day+'T12:00:00').toLocaleDateString('pt-BR')}
+function ledgerDay(l,byId){if(l.k==='v'&&l.orig&&byId[l.orig])return ledgerDay(byId[l.orig],byId);return historyDay(l)}
+function dailyBalances(extra){
+  var byId=Object.create(null);S.log.forEach(function(l){byId[l.u]=l});
+  var daily=Object.create(null);S.log.concat(extra?[extra]:[]).forEach(function(l){var day=ledgerDay(l,byId);daily[day]=(daily[day]||0)+l.d});
+  var dates=Object.keys(daily).sort(),bal=S.bal0||0,series=[];
+  dates.forEach(function(day){bal+=daily[day];series.push({day:day,balance:bal})});return series;
+}
+function historicCheck(day,cost){
+  var dates=dailyBalances(),prev=S.bal0||0;
+  for(var entry of dates){if(entry.day<=day)prev=entry.balance;else break}
+  if(prev<cost)return {ok:false,available:prev,reason:'Saldo insuficiente na data selecionada'};
+  for(var entry of dates){if(entry.day>=day&&entry.balance-cost<0)return {ok:false,available:prev,reason:'O resgate deixaria o saldo negativo em '+fmtFullDate(entry.day)}}
+  return {ok:true,available:prev};
+}
+var meritModal=null;
+function meritModalHtml(){if(!meritModal)return '';
+  var m=meritModal,record=m.kind==='used'?S.log.find(function(l){return l.u===m.id&&l.k==='r'&&!rvd(l)}):null;
+  if(m.kind==='used'&&!record)return '';
+  var reward=m.kind==='redeem'?S.rewards.find(function(r){return r.id===m.id}):null;
+  if(m.kind==='redeem'&&!reward)return '';
+  var title=m.kind==='used'?'Utilização da recompensa':'Resgatar recompensa';
+  var name=m.kind==='used'?record.l.replace(/^Resgate: /,''):reward.n;
+  var start=m.kind==='used'?historyDay(record):dstr(Date.now());
+  return '<div class="merit-overlay" role="presentation"><div class="merit-dialog" role="dialog" aria-modal="true" aria-label="'+title+'"><h3>'+title+'</h3><b>'+esc(name)+'</b><p class="dsum">'+fmt(m.kind==='used'?-record.d:reward.c)+' tokens</p>'+
+    (m.kind==='redeem'?'<label for="meritRedeemDate">Data do resgate</label><input id="meritRedeemDate" type="date" value="'+start+'" max="'+dstr(Date.now())+'"><label for="meritUsedStatus">Utilização</label><select id="meritUsedStatus" style="width:100%"><option value="pending">Vou utilizar posteriormente</option><option value="used">Já utilizei a recompensa</option></select><div id="meritUsedDateBox" hidden><label for="meritUsedDate">Data de utilização</label><input id="meritUsedDate" type="date" value="'+start+'" max="'+dstr(Date.now())+'"></div><p class="help" style="margin-top:14px">O sistema verificará o saldo no fechamento da data escolhida e em todos os dias posteriores.</p>':
+    '<label for="meritUsedDate">Data de utilização</label><input id="meritUsedDate" type="date" value="'+(record.used||start)+'" min="'+start+'" max="'+dstr(Date.now())+'"><p class="help" style="margin-top:14px">Marcar como utilizada não desconta tokens novamente.</p>')+
+    '<div class="merit-actions"><button class="btn g" data-meritcancel>Cancelar</button>'+(m.kind==='used'&&record.used?'<button class="btn g" data-meritclear>Desmarcar</button>':'')+'<button class="btn" data-meritconfirm>Confirmar</button></div></div></div>';
+}
+function validDay(x){return /^\d{4}-\d{2}-\d{2}$/.test(x)&&dstr(new Date(x+'T12:00:00').getTime())===x}
 var originalResumo=vResumo;
 vResumo=function(){var today=dstr(Date.now()),tasks=S.actions.filter(function(a){return sched(a,today)}),done=tasks.filter(function(a){return countOn(today,a.id)>0}).length,potential=tasks.reduce(function(n,a){return n+(countOn(today,a.id)?0:taskAt(a,today).p)},0);return '<div class="help">Hoje: '+done+' de '+tasks.length+' tarefas previstas · '+fmt(potential)+' tokens nas tarefas ainda não registradas.</div>'+originalResumo()+reports()};
 var originalReg=vReg;
@@ -499,6 +542,38 @@ function applyTheme(){if(S.theme&&S.theme!=='auto')document.documentElement.data
 applyTheme();
 document.addEventListener('click',function(e){var t=e.target.closest('[data-rawbackup]');if(!t)return;try{var content=localStorage.getItem('tokens_v1')||'',blob=new Blob([content],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='merito-dados-originais-recuperacao.json';a.click()}catch(x){toast('Armazenamento indisponível neste navegador')}});
 
+document.addEventListener('click',function(e){
+  var t=e.target.closest('button');if(!t)return;var d=t.dataset;
+  if(d.openredeem){meritModal={kind:'redeem',id:d.openredeem};render()}
+  else if(d.openused){meritModal={kind:'used',id:d.openused};render()}
+  else if(d.meritcancel!==undefined){meritModal=null;render()}
+  else if(d.meritclear!==undefined){var l=S.log.find(function(x){return x.u===meritModal.id&&x.k==='r'&&!rvd(x)});if(!l)return;delete l.used;if(save()){meritModal=null;toast('Recompensa voltou para pendentes')}render()}
+  else if(d.meritconfirm!==undefined){
+    if(busy())return;
+    if(!meritModal)return;
+    if(meritModal.kind==='used'){
+      var l=S.log.find(function(x){return x.u===meritModal.id&&x.k==='r'&&!rvd(x)}),used=document.getElementById('meritUsedDate').value;
+      if(!l||!validDay(used)||used<historyDay(l)||used>dstr(Date.now())){toast('Escolha uma data válida, a partir do resgate');return}
+      l.used=used;if(save()){meritModal=null;toast('Utilização registrada')}render();return;
+    }
+    var r=S.rewards.find(function(x){return x.id===meritModal.id}),day=document.getElementById('meritRedeemDate').value,status=document.getElementById('meritUsedStatus').value;
+    var used=status==='used'?document.getElementById('meritUsedDate').value:null;
+    if(!r||r.on===false||r.arch||!Number.isFinite(r.c)||r.c<=0)return;
+    if(!validDay(day)||day>dstr(Date.now())){toast('Data do resgate inválida');return}
+    if(status==='used'&&(!validDay(used)||used<day||used>dstr(Date.now()))){toast('A utilização deve ocorrer na data do resgate ou depois');return}
+    var check=historicCheck(day,r.c);
+    if(!check.ok){alert(check.reason+'\nSaldo no fechamento de '+fmtFullDate(day)+': '+fmt(check.available)+' tokens.');return}
+    if(!confirm('Resgatar "'+r.n+'" em '+fmtFullDate(day)+' por '+fmt(r.c)+' tokens?\nSaldo histórico antes do resgate: '+fmt(check.available)+'\nSaldo histórico depois: '+fmt(check.available-r.c)))return;
+    push('r','Resgate: '+r.n,-r.c,r.id);var entry=S.log[S.log.length-1];entry.rd=day;entry.cat=r.cat||'';if(used)entry.used=used;
+    if(save()){meritModal=null;toast('Resgate registrado em '+fmtFullDate(day))}render();
+  }
+});
+document.addEventListener('change',function(e){if(e.target.id==='meritUsedStatus'){
+  var box=document.getElementById('meritUsedDateBox');box.hidden=e.target.value!=='used';
+  var date=document.getElementById('meritRedeemDate').value;document.getElementById('meritUsedDate').value=date;
+}else if(e.target.id==='meritRedeemDate'){
+  var use=document.getElementById('meritUsedDate');if(use){use.min=e.target.value;if(use.value<e.target.value)use.value=e.target.value}
+}});
 function hardRefresh(){if(!navigator.serviceWorker)return; navigator.serviceWorker.getRegistration().then(function(r){return r?r.update():null}).then(function(){toast("Verificação concluída. Reabra o app para atualizar.")}).catch(function(){toast("Sem conexão: a versão offline foi preservada")})}
 
 try{window.persisted=localStorage.getItem("tokens_v1")}catch(e){storageBlocked=true}
